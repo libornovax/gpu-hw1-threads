@@ -19,6 +19,9 @@
 #include <vector>
 #include <chrono>
 
+#include "RandomLEQSolver.h"
+
+
 std::vector<std::string> buffer;
 #define BUFF_SIZE 5
 
@@ -83,6 +86,10 @@ void consumer ()
 
 int main (int argc, char* argv[])
 {
+    RandomLEQSolver s;
+    s.solve();
+
+    /*
     std::vector<std::thread> producers;
     for (int i = 0; i < 10; ++i) {
         producers.emplace_back(producer);
@@ -96,7 +103,7 @@ int main (int argc, char* argv[])
     std::cout << "hello" << std::endl;
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
-
+    */
 
     return EXIT_SUCCESS;
 }
