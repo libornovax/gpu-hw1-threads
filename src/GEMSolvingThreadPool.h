@@ -25,6 +25,11 @@ public:
      */
     std::shared_ptr<LEQSystem> getGEMSolvedLEQSystem ();
 
+    /**
+     * @brief Waits for the queue to be processed and shuts down the threads (synchronously waits)
+     */
+    void shutDown();
+
 
 private:
 
@@ -49,16 +54,20 @@ private:
     std::deque<std::shared_ptr<LEQSystem>> _buffer_in;
     // Output buffer of size STAGE3_BUFFER_SIZE (should be 1 as required by the assignment)
     std::deque<std::shared_ptr<LEQSystem>> _buffer_out;
+    // Pool of workers
+    std::vector<std::thread> _worker_pool;
 
+    std::atomic<int> _num_running_workers;
+    std::atomic<bool> _shut_down;
+
+    // Buffer access logic
     std::mutex _mtx_buffer_in;
     std::mutex _mtx_buffer_out;
-
     std::condition_variable _cv_buffer_in_full;
     std::condition_variable _cv_buffer_in_empty;
     std::condition_variable _cv_buffer_out_full;
     std::condition_variable _cv_buffer_out_empty;
 
-    std::vector<std::thread> _worker_pool;
 };
 
 #endif // GEMSOLVINGTHREADPOOL_H

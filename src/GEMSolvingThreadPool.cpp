@@ -1,10 +1,13 @@
 #include "GEMSolvingThreadPool.h"
 
+#include <cassert>
 #include "settings.h"
 #include "utils.h"
 
 
 GEMSolvingThreadPool::GEMSolvingThreadPool ()
+    : _num_running_workers(0),
+      _shut_down(false)
 {
     for (int i = 0; i < STAGE2_WORKERS_COUNT; ++i)
     {
@@ -58,23 +61,48 @@ std::shared_ptr<LEQSystem> GEMSolvingThreadPool::getGEMSolvedLEQSystem ()
 }
 
 
+void GEMSolvingThreadPool::shutDown ()
+{
+    this->_shut_down = true;
+
+    // Notify the waiting threads to shut down
+    this->_cv_buffer_in_empty.notify_all();
+
+    // Wait for all workers to finish
+    for (auto &w: this->_worker_pool) w.join();
+
+    assert(this->_num_running_workers == 0);
+}
+
+
 // ------------------------------------------  PRIVATE METHODS  ------------------------------------------ //
 
 void GEMSolvingThreadPool::_GEMWorker ()
 {
-    static int worker_id_count = 0;
-    int worker_id = worker_id_count++;
+    int worker_id = this->_num_running_workers++;
+    syncPrint("-- WORKER [" + std::to_string(worker_id) + "] starting");
 
     while (true)
     {
         auto ls = this->_getLEQSystem();
 
-        // Perform GEM on the system
-        // ...
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (ls)
+        {
+            // Perform GEM on the system
+            // ...
+            std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        this->_depositProcessedLEQSystem(ls);
+            this->_depositProcessedLEQSystem(ls);
+        }
+        else
+        {
+            // Null pointer means shut down
+            break;
+        }
     }
+
+    this->_num_running_workers--;
+    syncPrint("-- WORKER [" + std::to_string(worker_id) + "] shutting down");
 }
 
 
@@ -82,10 +110,17 @@ std::shared_ptr<LEQSystem> GEMSolvingThreadPool::_getLEQSystem ()
 {
     std::unique_lock<std::mutex> lk(this->_mtx_buffer_in);
 
-    if (this->_buffer_in.size() == 0)
+    if (this->_buffer_in.empty())
     {
+        // Empty buffer and we have the shut down signal
+        if (this->_shut_down) return nullptr;
+
         // Input buffer empty
-        this->_cv_buffer_in_empty.wait(lk, [this](){ return this->_buffer_in.size() > 0; });
+        this->_cv_buffer_in_empty.wait(lk, [this](){ return !this->_buffer_in.empty() || this->_shut_down; });
+
+        // The wait was interrupted by a shut down signal and there is nothing more to be processed - we can
+        // shut down this worker
+        if (this->_buffer_in.empty() && this->_shut_down) return nullptr;
     }
 
     auto ls = this->_buffer_in.front();

@@ -45,12 +45,6 @@ private:
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //
     GEMSolvingThreadPool _thread_pool;
 
-    // Stage 3 - rank computation
-    std::shared_ptr<LEQSystem> _rank_in;
-    std::mutex _mtx_rank_in;
-    std::condition_variable _cv_rank_in;
-    std::condition_variable _cv_rank_in_empty;
-
     // Stage 4 - save results
     std::shared_ptr<LEQSystem> _save_in;
     std::mutex _mtx_save_in;

@@ -29,6 +29,10 @@ void RandomLEQSolver::solve ()
     // Saving of the results
     std::thread t_save(&RandomLEQSolver::_saveResults, this);
 
+    t_generator.join();
+    syncPrint("-----------------  SHUT DOWN INITIATED  -----------------");
+    this->_thread_pool.shutDown();
+
     // After the save thread finishes, the whole thing is done
     t_save.join();
 }
@@ -66,7 +70,7 @@ void RandomLEQSolver::_determineRank ()
             // There are data now
             this->_cv_save_in_empty.wait(lk2, [this](){ return bool(!this->_save_in); });
         }
-        this->_save_in = this->_rank_in;
+        this->_save_in = ls;
 
         lk2.unlock();
         this->_cv_save_in.notify_all();
@@ -85,21 +89,15 @@ void RandomLEQSolver::_saveResults ()
 {
     while (true)
     {
-        // If we use a different order of the locks we will have a deadlock!
-        std::unique_lock<std::mutex> lk1(this->_mtx_rank_in);
-
         std::unique_lock<std::mutex> lk3(this->_mtx_save_in);
 
         // Check if we should not close the whole program
         if (!this->_save_in                             // Nothing is on the save input
-                && !this->_rank_in                      // Nothing is on the rank input
                 && this->_shut_down)                    // Shut down was initiated
         {
 //            syncPrint("---- TASKS PROCESSED " + std::to_string(this->_tasks_processed) + " ----");
             break;
         }
-
-        lk1.unlock();
 
 
         if (!this->_save_in)
