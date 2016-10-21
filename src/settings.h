@@ -10,6 +10,7 @@
 
 // Size of the equation buffer on the input to the worker thread pool
 #define STAGE2_BUFFER_SIZE 5
+#define STAGE3_BUFFER_SIZE 1
 
 // Number of GEM worker threads
 #define STAGE2_WORKERS_COUNT 3

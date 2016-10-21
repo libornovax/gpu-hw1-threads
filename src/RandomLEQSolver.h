@@ -8,6 +8,7 @@
 #include <condition_variable>
 
 #include "LEQSystem.h"
+#include "GEMSolvingThreadPool.h"
 
 
 /**
@@ -42,16 +43,7 @@ private:
 
 
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //
-    // Stage 1-2 - equation systems generation
-    std::vector<std::shared_ptr<LEQSystem>> _leq_system_queue;
-    std::mutex _mtx_generator;
-    std::condition_variable _cv_full;
-    std::condition_variable _cv_empty;
-
-    // Stage 2 - GEM
-    std::vector<std::thread> _workers;
-    std::atomic<int> _workers_running;
-    std::atomic<int> _tasks_processed;
+    GEMSolvingThreadPool _thread_pool;
 
     // Stage 3 - rank computation
     std::shared_ptr<LEQSystem> _rank_in;
