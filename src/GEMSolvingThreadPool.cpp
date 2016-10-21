@@ -7,7 +7,9 @@
 
 GEMSolvingThreadPool::GEMSolvingThreadPool ()
     : _num_running_workers(0),
-      _shut_down(false)
+      _shut_down(false),
+      _buffer_in(nullptr),
+      _buffer_out(nullptr)
 {
     for (int i = 0; i < STAGE2_WORKERS_COUNT; ++i)
     {
@@ -24,53 +26,19 @@ GEMSolvingThreadPool::~GEMSolvingThreadPool ()
 
 void GEMSolvingThreadPool::addLEQSystem (const std::shared_ptr<LEQSystem> &ls)
 {
-    std::unique_lock<std::mutex> lk(this->_mtx_buffer_in);
-
-    if (this->_buffer_in.size() >= STAGE2_BUFFER_SIZE)
-    {
-        // Input buffer full
-        this->_cv_buffer_in_full.wait(lk, [this](){ return this->_buffer_in.size() < STAGE2_BUFFER_SIZE; });
-    }
-
-#ifdef DEBUG_PRINT
-    syncPrint("TP: INPUT <<-- (" + std::to_string(ls->getIdx()) + ")");
-#endif
     this->_buffer_in.push_back(ls);
-
-    lk.unlock();
-    this->_cv_buffer_in_empty.notify_all();
 }
 
 
 std::shared_ptr<LEQSystem> GEMSolvingThreadPool::getGEMSolvedLEQSystem ()
 {
-    std::unique_lock<std::mutex> lk(this->_mtx_buffer_out);
-
-    if (this->_buffer_out.empty())
+    // We need to check if we should shut down (SynQ cannot test for running workers!)
+    if (this->_shut_down && this->_num_running_workers == 0 && this->_buffer_out.empty())
     {
-        // Shutdown requested, the output buffer is empty and there are no more running workers
-        if (this->_shut_down && this->_num_running_workers == 0) return nullptr;
-
-        // Output buffer empty - wait for data
-        this->_cv_buffer_out_empty.wait(lk, [this](){
-            return !this->_buffer_out.empty() || (this->_shut_down && this->_num_running_workers == 0);
-        });
-
-        // Shutdown requested, the output buffer is empty and there are no more running workers
-        if (this->_buffer_out.empty() && this->_shut_down && this->_num_running_workers == 0) return nullptr;
+        return nullptr;
     }
 
-    auto ls = this->_buffer_out.front();
-    this->_buffer_out.pop_front();
-
-#ifdef DEBUG_PRINT
-    syncPrint("TP: OUTPUT -->> (" + std::to_string(ls->getIdx()) + ")");
-#endif
-
-    lk.unlock();
-    this->_cv_buffer_out_full.notify_all();
-
-    return ls;
+    return this->_buffer_out.pop_front();
 }
 
 
@@ -79,7 +47,9 @@ void GEMSolvingThreadPool::shutDown ()
     this->_shut_down = true;
 
     // Notify the waiting threads to shut down
-    this->_cv_buffer_in_empty.notify_all();
+    // They will shut down automatically by reading the this->_shut_down variable and having nothing in the
+    // input queue or they will receive this signal if they are waiting
+    this->_buffer_in.shutDown();
 
     // Wait for all workers to finish
     for (auto &w: this->_worker_pool) w.join();
@@ -87,7 +57,9 @@ void GEMSolvingThreadPool::shutDown ()
     assert(this->_num_running_workers == 0);
 
     // Notify the output that we shut down - propagate the shut down
-    this->_cv_buffer_out_empty.notify_all();
+    // The thread that is processing the output will either detect shut down in the getGEMSolvedLEQSystem()
+    // function or it will receive this signal if it is waiting
+    this->_buffer_out.shutDown();
 }
 
 
@@ -98,7 +70,7 @@ void GEMSolvingThreadPool::_GEMWorker ()
     int worker_id = this->_num_running_workers++;
     syncPrint("-- WORKER [" + std::to_string(worker_id) + "] starting");
 
-    while (true)
+    while (!(this->_shut_down && this->_buffer_in.empty()))
     {
         auto ls = this->_getLEQSystem();
 
@@ -125,51 +97,12 @@ void GEMSolvingThreadPool::_GEMWorker ()
 
 std::shared_ptr<LEQSystem> GEMSolvingThreadPool::_getLEQSystem ()
 {
-    std::unique_lock<std::mutex> lk(this->_mtx_buffer_in);
-
-    if (this->_buffer_in.empty())
-    {
-        // Empty buffer and we have the shut down signal
-        if (this->_shut_down) return nullptr;
-
-        // Input buffer empty
-        this->_cv_buffer_in_empty.wait(lk, [this](){ return !this->_buffer_in.empty() || this->_shut_down; });
-
-        // The wait was interrupted by a shut down signal and there is nothing more to be processed - we can
-        // shut down this worker
-        if (this->_buffer_in.empty() && this->_shut_down) return nullptr;
-    }
-
-    auto ls = this->_buffer_in.front();
-    this->_buffer_in.pop_front();
-
-#ifdef DEBUG_PRINT
-    syncPrint("TP: INPUT -->> (" + std::to_string(ls->getIdx()) + ")");
-#endif
-
-    lk.unlock();
-    this->_cv_buffer_in_full.notify_all();
-
-    return ls;
+    return this->_buffer_in.pop_front();
 }
 
 
 void GEMSolvingThreadPool::_depositProcessedLEQSystem (const std::shared_ptr<LEQSystem> &ls)
 {
-    std::unique_lock<std::mutex> lk(this->_mtx_buffer_out);
-
-    if (this->_buffer_in.size() >= STAGE3_BUFFER_SIZE)
-    {
-        // Output buffer full
-        this->_cv_buffer_out_full.wait(lk, [this](){ return this->_buffer_out.size() < STAGE3_BUFFER_SIZE; });
-    }
-
-#ifdef DEBUG_PRINT
-    syncPrint("TP: OUTPUT <<-- (" + std::to_string(ls->getIdx()) + ")");
-#endif
     this->_buffer_out.push_back(ls);
-
-    lk.unlock();
-    this->_cv_buffer_out_empty.notify_all();
 }
 

@@ -1,3 +1,8 @@
+//
+// Libor Novak
+// 10/20/2016
+//
+
 #ifndef LEQSYSTEM_H
 #define LEQSYSTEM_H
 
