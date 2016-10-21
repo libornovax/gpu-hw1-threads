@@ -6,14 +6,19 @@
 
 LEQSystem::LEQSystem (int idx)
     : _idx(idx),
-      _A(MATRIX_DIM*MATRIX_DIM),
       _b(MATRIX_DIM)
 {
+    this->_A.resize(MATRIX_DIM);
+    for (auto &row: this->_A)
+    {
+        row.resize(MATRIX_DIM);
+    }
+
     this->_randomInit();
 }
 
 
-std::vector<double>& LEQSystem::getA ()
+std::vector<std::vector<double>>& LEQSystem::getA ()
 {
     return this->_A;
 }
@@ -40,6 +45,10 @@ void LEQSystem::_randomInit ()
     std::mt19937 mt(rd());
     std::uniform_int_distribution<> dist(-1000, 1000);
 
-    for (auto &cell: this->_A) cell = dist(mt);
+    for (auto &row: this->_A)
+    {
+        for (auto &cell: row) cell = dist(mt);
+    }
+
     for (auto &cell: this->_b) cell = dist(mt);
 }

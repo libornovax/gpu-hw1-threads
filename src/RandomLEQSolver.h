@@ -10,6 +10,13 @@
 #include "LEQSystem.h"
 
 
+/**
+ * @brief The RandomLEQSolver class
+ *  1. Randomly generate a set of equations Ax=b
+ *  2. Gauss eliminate the matrices of the extended system (using a pool of workers)
+ *  3. Determine matrix rank
+ *  4. Write out the solution
+ */
 class RandomLEQSolver
 {
 public:
@@ -25,12 +32,13 @@ private:
     void _generateEquationSystems ();
 
     void _GEMWorker ();
-
     static void _runGEM (std::shared_ptr<LEQSystem> &leq_system);
 
     void _determineRank ();
+    static void _runDetermineRank (std::shared_ptr<LEQSystem> &leq_system);
 
     void _saveResults ();
+    static void _runSaving (std::shared_ptr<LEQSystem> &leq_system);
 
 
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //

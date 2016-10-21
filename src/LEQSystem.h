@@ -11,7 +11,7 @@ public:
     LEQSystem (int idx);
 
 
-    std::vector<double>& getA ();
+    std::vector<std::vector<double>>& getA ();
 
     std::vector<double>& getb ();
 
@@ -25,7 +25,7 @@ private:
 
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //
     // System of linear equations in the form A*x = b
-    std::vector<double> _A;
+    std::vector<std::vector<double>> _A;
     std::vector<double> _b;
 
     // Identifier of the equation system
