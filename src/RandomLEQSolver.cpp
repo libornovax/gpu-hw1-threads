@@ -7,8 +7,7 @@
 
 
 RandomLEQSolver::RandomLEQSolver ()
-    : _shut_down(false),
-      _save_in(nullptr)
+    : _save_in(nullptr)
 {
 }
 
@@ -77,7 +76,6 @@ void RandomLEQSolver::_determineRank ()
         {
             // Null pointer means shut down
             this->_save_in.shutDown();
-            this->_shut_down = true;
             break;
         }
     }
@@ -97,7 +95,7 @@ void RandomLEQSolver::_saveResults ()
 {
     syncPrint("-- SAVE starting");
 
-    while (!(this->_shut_down && this->_save_in.empty()))
+    while (true)
     {
         auto ls = this->_save_in.pop_front();
 

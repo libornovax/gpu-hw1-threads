@@ -7,7 +7,6 @@
 
 GEMSolvingThreadPool::GEMSolvingThreadPool ()
     : _num_running_workers(0),
-      _shut_down(false),
       _buffer_in(nullptr),
       _buffer_out(nullptr)
 {
@@ -20,7 +19,6 @@ GEMSolvingThreadPool::GEMSolvingThreadPool ()
 
 GEMSolvingThreadPool::~GEMSolvingThreadPool ()
 {
-
 }
 
 
@@ -32,33 +30,24 @@ void GEMSolvingThreadPool::addLEQSystem (const std::shared_ptr<LEQSystem> &ls)
 
 std::shared_ptr<LEQSystem> GEMSolvingThreadPool::getGEMSolvedLEQSystem ()
 {
-    // We need to check if we should shut down (SynQ cannot test for running workers!)
-    if (this->_shut_down && this->_num_running_workers == 0 && this->_buffer_out.empty())
-    {
-        return nullptr;
-    }
-
     return this->_buffer_out.pop_front();
 }
 
 
 void GEMSolvingThreadPool::shutDown ()
 {
-    this->_shut_down = true;
-
-    // Notify the waiting threads to shut down
-    // They will shut down automatically by reading the this->_shut_down variable and having nothing in the
-    // input queue or they will receive this signal if they are waiting
+    // Notify the workers to shut down (all of them will receive the shut down signal once the buffer is
+    // empty)
     this->_buffer_in.shutDown();
 
-    // Wait for all workers to finish
+    // Wait for all workers to finish - VERY IMPORTANT (otherwise we could shut down the rest of
+    // the pipeline before all workers have finished processing!)
     for (auto &w: this->_worker_pool) w.join();
 
     assert(this->_num_running_workers == 0);
 
     // Notify the output that we shut down - propagate the shut down
-    // The thread that is processing the output will either detect shut down in the getGEMSolvedLEQSystem()
-    // function or it will receive this signal if it is waiting
+    // All threads processing this buffer will receive the shut down signal once the buffer is empty
     this->_buffer_out.shutDown();
 }
 
@@ -70,9 +59,10 @@ void GEMSolvingThreadPool::_GEMWorker ()
     int worker_id = this->_num_running_workers++;
     syncPrint("-- WORKER [" + std::to_string(worker_id) + "] starting");
 
-    while (!(this->_shut_down && this->_buffer_in.empty()))
+    while (true)
     {
-        auto ls = this->_getLEQSystem();
+        // Load an available unsolved system from the input buffer
+        auto ls = this->_buffer_in.pop_front();
 
         if (ls)
         {
@@ -81,7 +71,8 @@ void GEMSolvingThreadPool::_GEMWorker ()
             syncPrint("TP: WORKER [" + std::to_string(worker_id) + "] processing (" + std::to_string(ls->getIdx()) + ")");
             std::this_thread::sleep_for(std::chrono::seconds(1));
 
-            this->_depositProcessedLEQSystem(ls);
+            // Deposit a solved system to the output buffer
+            this->_buffer_out.push_back(ls);
         }
         else
         {
@@ -94,15 +85,4 @@ void GEMSolvingThreadPool::_GEMWorker ()
     syncPrint("-- WORKER [" + std::to_string(worker_id) + "] shutting down");
 }
 
-
-std::shared_ptr<LEQSystem> GEMSolvingThreadPool::_getLEQSystem ()
-{
-    return this->_buffer_in.pop_front();
-}
-
-
-void GEMSolvingThreadPool::_depositProcessedLEQSystem (const std::shared_ptr<LEQSystem> &ls)
-{
-    this->_buffer_out.push_back(ls);
-}
 

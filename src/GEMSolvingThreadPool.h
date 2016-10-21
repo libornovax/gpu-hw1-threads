@@ -19,6 +19,7 @@
 class GEMSolvingThreadPool
 {
 public:
+
     GEMSolvingThreadPool ();
     ~GEMSolvingThreadPool ();
 
@@ -45,16 +46,6 @@ private:
      */
     void _GEMWorker ();
 
-    /**
-     * @brief Loads an available unsolved system from the input buffer
-     */
-    std::shared_ptr<LEQSystem> _getLEQSystem ();
-
-    /**
-     * @brief Deposits a solved system to the output buffer
-     */
-    void _depositProcessedLEQSystem (const std::shared_ptr<LEQSystem> &ls);
-
 
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //
     // Input buffer of size STAGE2_BUFFER_SIZE
@@ -65,7 +56,6 @@ private:
     std::vector<std::thread> _worker_pool;
 
     std::atomic<int> _num_running_workers;
-    std::atomic<bool> _shut_down;
 
 };
 

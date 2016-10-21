@@ -50,6 +50,13 @@ T SynQ<T, SIZE>::pop_front ()
 
     if (this->_queue.empty())
     {
+        if (this->_input_forbidden)
+        {
+            // Another thread asked for data from the queue, but the queue is empty and new data
+            // will not come
+            return this->_shut_down_signal;
+        }
+
         // Queue empty
         this->_cv_empty.wait(lk);
 
@@ -88,13 +95,16 @@ void SynQ<T, SIZE>::shutDown ()
 {
     std::unique_lock<std::mutex> lk(this->_mtx);
 
+    // Forbid any further insertion to the queue
+    this->_input_forbidden = true;
+
+    // Wait for the whole queue to be processed
     if (!this->_queue.empty())
     {
         // Queue empty
         this->_cv_full.wait(lk, [this](){ return this->_queue.empty(); });
     }
 
-    this->_input_forbidden = true;
     lk.unlock();
 
     // Send shut down signal - queue is empty after notification (which otherwise does not happen)

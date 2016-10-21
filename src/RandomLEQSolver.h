@@ -52,15 +52,6 @@ private:
 
     // Stage 4 - save results
     SynQ<std::shared_ptr<LEQSystem>, 1> _save_in;
-    // Input variable (queue of size 1)
-//    std::shared_ptr<LEQSystem> _save_in;
-    // Input logic
-    std::mutex _mtx_save_in;
-    std::condition_variable _cv_save_in_full;
-    std::condition_variable _cv_save_in_empty;
-
-    // Shut down signal for the saving thread
-    std::atomic<bool> _shut_down;
 
 };
 
