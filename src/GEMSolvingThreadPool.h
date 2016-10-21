@@ -1,3 +1,8 @@
+//
+// Libor Novak
+// 10/21/2016
+//
+
 #ifndef GEMSOLVINGTHREADPOOL_H
 #define GEMSOLVINGTHREADPOOL_H
 
@@ -7,6 +12,8 @@
 #include <thread>
 #include <atomic>
 #include "LEQSystem.h"
+#include "SynQ.h"
+#include "settings.h"
 
 
 class GEMSolvingThreadPool
@@ -51,22 +58,14 @@ private:
 
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //
     // Input buffer of size STAGE2_BUFFER_SIZE
-    std::deque<std::shared_ptr<LEQSystem>> _buffer_in;
+    SynQ<std::shared_ptr<LEQSystem>, STAGE2_BUFFER_SIZE> _buffer_in;
     // Output buffer of size STAGE3_BUFFER_SIZE (should be 1 as required by the assignment)
-    std::deque<std::shared_ptr<LEQSystem>> _buffer_out;
+    SynQ<std::shared_ptr<LEQSystem>, STAGE3_BUFFER_SIZE> _buffer_out;
     // Pool of workers
     std::vector<std::thread> _worker_pool;
 
     std::atomic<int> _num_running_workers;
     std::atomic<bool> _shut_down;
-
-    // Buffer access logic
-    std::mutex _mtx_buffer_in;
-    std::mutex _mtx_buffer_out;
-    std::condition_variable _cv_buffer_in_full;
-    std::condition_variable _cv_buffer_in_empty;
-    std::condition_variable _cv_buffer_out_full;
-    std::condition_variable _cv_buffer_out_empty;
 
 };
 

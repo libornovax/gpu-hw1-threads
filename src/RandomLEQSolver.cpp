@@ -7,7 +7,8 @@
 
 
 RandomLEQSolver::RandomLEQSolver ()
-    : _shut_down(false)
+    : _shut_down(false),
+      _save_in(nullptr)
 {
 }
 
@@ -70,28 +71,13 @@ void RandomLEQSolver::_determineRank ()
             // Determine the rank of this system
             this->_runDetermineRank(ls);
 
-            {
-                // Pass the data to the saving thread
-                std::unique_lock<std::mutex> lk(this->_mtx_save_in);
-
-                if (this->_save_in)
-                {
-                    // There are data now
-                    this->_cv_save_in_empty.wait(lk, [this](){ return bool(!this->_save_in); });
-                }
-
-                // Write the LEQSystem to the input of the saving thread
-                this->_save_in = ls;
-
-                lk.unlock();
-                this->_cv_save_in_full.notify_one();
-            }
+            this->_save_in.push_back(ls);
         }
         else
         {
             // Null pointer means shut down
+            this->_save_in.shutDown();
             this->_shut_down = true;
-            this->_cv_save_in_full.notify_one();
             break;
         }
     }
@@ -111,26 +97,19 @@ void RandomLEQSolver::_saveResults ()
 {
     syncPrint("-- SAVE starting");
 
-    while (true)
+    while (!(this->_shut_down && this->_save_in.empty()))
     {
-        std::unique_lock<std::mutex> lk(this->_mtx_save_in);
+        auto ls = this->_save_in.pop_front();
 
-        if (!this->_save_in)
+        if (ls)
         {
-            if (this->_shut_down) break;
-
-            // No data on input, wait
-            this->_cv_save_in_full.wait(lk, [this](){ return bool(this->_save_in) || this->_shut_down; });
-
-            if (!this->_save_in && this->_shut_down) break;
+            this->_runSaving(ls);
         }
-
-        // Save the data
-        this->_runSaving(this->_save_in);
-        this->_save_in = nullptr;
-
-        lk.unlock();
-        this->_cv_save_in_empty.notify_one();
+        else
+        {
+            // Null pointer - Shut down signal received
+            break;
+        }
     }
 
     syncPrint("-- SAVE shutting down");
