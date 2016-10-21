@@ -25,15 +25,15 @@ public:
     RandomLEQSolver ();
     ~RandomLEQSolver ();
 
+    /**
+     * @brief Runs the whole process of generating and solving the systems of linear equations
+     */
     void solve ();
 
 
 private:
 
     void _generateEquationSystems ();
-
-    void _GEMWorker ();
-    static void _runGEM (std::shared_ptr<LEQSystem> &leq_system);
 
     void _determineRank ();
     static void _runDetermineRank (std::shared_ptr<LEQSystem> &leq_system);
@@ -46,11 +46,14 @@ private:
     GEMSolvingThreadPool _thread_pool;
 
     // Stage 4 - save results
+    // Input variable (queue of size 1)
     std::shared_ptr<LEQSystem> _save_in;
+    // Input logic
     std::mutex _mtx_save_in;
-    std::condition_variable _cv_save_in;
+    std::condition_variable _cv_save_in_full;
     std::condition_variable _cv_save_in_empty;
 
+    // Shut down signal for the saving thread
     std::atomic<bool> _shut_down;
 
 };

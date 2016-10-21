@@ -14,6 +14,8 @@ set ( EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin )
 set ( CMAKE_CXX_FLAGS "-g -std=c++11" )
 set ( DEBUG_MODE ON )
 
+#add_definitions ( -DDEBUG_PRINT )
+
 
 INCLUDE_DIRECTORIES ( src )
 

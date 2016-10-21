@@ -32,7 +32,9 @@ void GEMSolvingThreadPool::addLEQSystem (const std::shared_ptr<LEQSystem> &ls)
         this->_cv_buffer_in_full.wait(lk, [this](){ return this->_buffer_in.size() < STAGE2_BUFFER_SIZE; });
     }
 
+#ifdef DEBUG_PRINT
     syncPrint("TP: INPUT <<-- (" + std::to_string(ls->getIdx()) + ")");
+#endif
     this->_buffer_in.push_back(ls);
 
     lk.unlock();
@@ -44,15 +46,26 @@ std::shared_ptr<LEQSystem> GEMSolvingThreadPool::getGEMSolvedLEQSystem ()
 {
     std::unique_lock<std::mutex> lk(this->_mtx_buffer_out);
 
-    if (this->_buffer_out.size() == 0)
+    if (this->_buffer_out.empty())
     {
-        // Output buffer empty
-        this->_cv_buffer_out_empty.wait(lk, [this](){ return this->_buffer_out.size() > 0; });
+        // Shutdown requested, the output buffer is empty and there are no more running workers
+        if (this->_shut_down && this->_num_running_workers == 0) return nullptr;
+
+        // Output buffer empty - wait for data
+        this->_cv_buffer_out_empty.wait(lk, [this](){
+            return !this->_buffer_out.empty() || (this->_shut_down && this->_num_running_workers == 0);
+        });
+
+        // Shutdown requested, the output buffer is empty and there are no more running workers
+        if (this->_buffer_out.empty() && this->_shut_down && this->_num_running_workers == 0) return nullptr;
     }
 
     auto ls = this->_buffer_out.front();
     this->_buffer_out.pop_front();
+
+#ifdef DEBUG_PRINT
     syncPrint("TP: OUTPUT -->> (" + std::to_string(ls->getIdx()) + ")");
+#endif
 
     lk.unlock();
     this->_cv_buffer_out_full.notify_all();
@@ -72,6 +85,9 @@ void GEMSolvingThreadPool::shutDown ()
     for (auto &w: this->_worker_pool) w.join();
 
     assert(this->_num_running_workers == 0);
+
+    // Notify the output that we shut down - propagate the shut down
+    this->_cv_buffer_out_empty.notify_all();
 }
 
 
@@ -90,6 +106,7 @@ void GEMSolvingThreadPool::_GEMWorker ()
         {
             // Perform GEM on the system
             // ...
+            syncPrint("TP: WORKER [" + std::to_string(worker_id) + "] processing (" + std::to_string(ls->getIdx()) + ")");
             std::this_thread::sleep_for(std::chrono::seconds(1));
 
             this->_depositProcessedLEQSystem(ls);
@@ -125,7 +142,10 @@ std::shared_ptr<LEQSystem> GEMSolvingThreadPool::_getLEQSystem ()
 
     auto ls = this->_buffer_in.front();
     this->_buffer_in.pop_front();
+
+#ifdef DEBUG_PRINT
     syncPrint("TP: INPUT -->> (" + std::to_string(ls->getIdx()) + ")");
+#endif
 
     lk.unlock();
     this->_cv_buffer_in_full.notify_all();
@@ -144,7 +164,9 @@ void GEMSolvingThreadPool::_depositProcessedLEQSystem (const std::shared_ptr<LEQ
         this->_cv_buffer_out_full.wait(lk, [this](){ return this->_buffer_out.size() < STAGE3_BUFFER_SIZE; });
     }
 
+#ifdef DEBUG_PRINT
     syncPrint("TP: OUTPUT <<-- (" + std::to_string(ls->getIdx()) + ")");
+#endif
     this->_buffer_out.push_back(ls);
 
     lk.unlock();
