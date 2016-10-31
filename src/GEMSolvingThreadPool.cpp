@@ -67,9 +67,8 @@ void GEMSolvingThreadPool::_GEMWorker ()
         if (ls)
         {
             // Perform GEM on the system
-            // ...
             syncPrint("TP: WORKER [" + std::to_string(worker_id) + "] processing (" + std::to_string(ls->getIdx()) + ")");
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            this->_gem(ls);
 
             // Deposit a solved system to the output buffer
             this->_buffer_out.push_back(ls);
@@ -84,5 +83,33 @@ void GEMSolvingThreadPool::_GEMWorker ()
     this->_num_running_workers--;
     syncPrint("-- WORKER [" + std::to_string(worker_id) + "] shutting down");
 }
+
+
+void GEMSolvingThreadPool::_gem (const std::shared_ptr<LEQSystem> &ls)
+{
+    // WARNING! We do not take care of zeros on the diagonal!
+    //          We also do not reorder the rows of the matrix!
+
+    auto &A = ls->getA();
+    auto &b = ls->getb();
+
+    // Generate the upper triangular matrix
+    for (size_t i = 0; i < A.size()-1; i++)
+    {
+        for (size_t ii = i+1; ii < A.size(); ii++)
+        {
+            // Coefficient that mutliplies each element of the i-th row
+            double c = A[ii][i] / A[i][i];
+
+            for (size_t j = 0; j < A[i].size(); j++)
+            {
+                if (j < ii) A[ii][j] = 0;
+                else A[ii][j] = A[ii][j] - c * A[i][j];
+            }
+            b[ii] = b[ii] - c * b[i];
+        }
+    }
+}
+
 
 

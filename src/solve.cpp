@@ -22,5 +22,7 @@ int main (int argc, char* argv[])
     RandomLEQSolver s;
     s.solve();
 
+    // Solver generates a file output.txt in the bin folder
+
     return EXIT_SUCCESS;
 }

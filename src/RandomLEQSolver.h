@@ -6,11 +6,7 @@
 #ifndef RANDOMLEQSOLVER_H
 #define RANDOMLEQSOLVER_H
 
-#include <thread>
-#include <vector>
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
+#include <fstream>
 
 #include "LEQSystem.h"
 #include "GEMSolvingThreadPool.h"
@@ -40,14 +36,15 @@ private:
 
     void _generateEquationSystems ();
 
-    void _determineRank ();
-    static void _runDetermineRank (std::shared_ptr<LEQSystem> &leq_system);
+    void _solve ();
+    static void _runSolving (std::shared_ptr<LEQSystem> &leq_system);
 
     void _saveResults ();
-    static void _runSaving (std::shared_ptr<LEQSystem> &leq_system);
+    void _runSaving (std::shared_ptr<LEQSystem> &leq_system);
 
 
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //
+    std::ofstream _out_file;
     GEMSolvingThreadPool _thread_pool;
 
     // Stage 4 - save results

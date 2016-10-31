@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <iomanip>
 #include "settings.h"
 #include "utils.h"
 
@@ -9,12 +10,13 @@
 RandomLEQSolver::RandomLEQSolver ()
     : _save_in(nullptr)
 {
+    this->_out_file.open("output.txt");
 }
 
 
 RandomLEQSolver::~RandomLEQSolver ()
 {
-
+    this->_out_file.close();
 }
 
 
@@ -23,7 +25,7 @@ void RandomLEQSolver::solve ()
     // Equation systems generator
     std::thread t_generator(&RandomLEQSolver::_generateEquationSystems, this);
     // Rank computation
-    std::thread t_rank(&RandomLEQSolver::_determineRank, this);
+    std::thread t_rank(&RandomLEQSolver::_solve, this);
     // Saving of the results
     std::thread t_save(&RandomLEQSolver::_saveResults, this);
 
@@ -57,9 +59,9 @@ void RandomLEQSolver::_generateEquationSystems ()
 }
 
 
-void RandomLEQSolver::_determineRank ()
+void RandomLEQSolver::_solve ()
 {
-    syncPrint("-- RANK starting");
+    syncPrint("-- SOLVE starting");
 
     while (true)
     {
@@ -68,7 +70,7 @@ void RandomLEQSolver::_determineRank ()
         if (ls)
         {
             // Determine the rank of this system
-            this->_runDetermineRank(ls);
+            this->_runSolving(ls);
 
             this->_save_in.push_back(ls);
         }
@@ -80,14 +82,30 @@ void RandomLEQSolver::_determineRank ()
         }
     }
 
-    syncPrint("-- RANK shutting down");
+    syncPrint("-- SOLVE shutting down");
 }
 
 
-void RandomLEQSolver::_runDetermineRank (std::shared_ptr<LEQSystem> &leq_system)
+void RandomLEQSolver::_runSolving (std::shared_ptr<LEQSystem> &leq_system)
 {
-    syncPrint("Computing rank (" + std::to_string(leq_system->getIdx()) + ")");
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    syncPrint("Solving (" + std::to_string(leq_system->getIdx()) + ")");
+
+    // We skip rank computation because this exercise is about thread synchronization so we do not care
+    // about a precise solution to the equation solving problem...
+
+    auto &A = leq_system->getA();
+    auto &b = leq_system->getb();
+    auto &x = leq_system->getx(); // This is the solution
+
+    for (int i = A.size()-1; i >= 0; i--)
+    {
+        double sum = 0;
+        for (size_t j = i+1; j < A.size(); j++)
+        {
+            sum = sum + A[i][j]*x[j];
+        }
+        x[i] = (b[i] - sum) / A[i][i];
+    }
 }
 
 
@@ -117,8 +135,20 @@ void RandomLEQSolver::_saveResults ()
 void RandomLEQSolver::_runSaving (std::shared_ptr<LEQSystem> &leq_system)
 {
     syncPrint("Saving (" + std::to_string(leq_system->getIdx()) + ")");
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-}
 
+    // We do not need any thread synchronization here because we have only one output thread
+    this->_out_file << "==============================================   " << std::setw(4) << leq_system->getIdx() << "   ==============================================" << std::endl;
+    this->_out_file << leq_system->print();
+    this->_out_file << "------------------------------------------------------------------------------------------------------" << std::endl;
+    this->_out_file << "Solution: ";
+
+    auto x = leq_system->getx();
+    for (int i = 0; i < x.size(); ++i)
+    {
+        if (i > 0) this->_out_file << "          ";
+        this->_out_file << " x" << i << " = " << x[i] << std::endl;
+    }
+    this->_out_file << std::endl << std::endl;
+}
 
 

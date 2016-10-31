@@ -46,6 +46,12 @@ private:
      */
     void _GEMWorker ();
 
+    /**
+     * @brief Runs Gauss Elimination on the given equation system
+     * @param ls Pointer to an equation system
+     */
+    static void _gem (const std::shared_ptr<LEQSystem> &ls);
+
 
     // -------------------------------------  PRIVATE MEMBERS  ------------------------------------- //
     // Input buffer of size STAGE2_BUFFER_SIZE

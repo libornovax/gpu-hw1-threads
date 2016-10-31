@@ -20,8 +20,11 @@ public:
 
     std::vector<double>& getb ();
 
+    std::vector<double>& getx ();
+
     int getIdx () const;
 
+    std::string print () const;
 
 private:
 
@@ -32,6 +35,8 @@ private:
     // System of linear equations in the form A*x = b
     std::vector<std::vector<double>> _A;
     std::vector<double> _b;
+    // Solution
+    std::vector<double> _x;
 
     // Identifier of the equation system
     int _idx;
