@@ -93,6 +93,8 @@ void RandomLEQSolver::_runSolving (std::shared_ptr<LEQSystem> &leq_system)
     // We skip rank computation because this exercise is about thread synchronization so we do not care
     // about a precise solution to the equation solving problem...
 
+    // We also do not care about the situation, when the A matrix does not have full rank
+
     auto &A = leq_system->getA();
     auto &b = leq_system->getb();
     auto &x = leq_system->getx(); // This is the solution
