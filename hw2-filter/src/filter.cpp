@@ -7,26 +7,45 @@
 //
 
 #include <iostream>
+#include <chrono>
 #include "settings.h"
 #include "ArrayGenerator.h"
 #include "cpu/CPUFilter.h"
+#include "gpu/GPUFilter.h"
 
 
 int main (int argc, char* argv[])
 {
     DataArray da = ArrayGenerator::generateRandomArray(ARRAY_SIZE);
 
+#ifdef MEASURE_TIME
+    auto start1 = std::chrono::high_resolution_clock::now();
+#endif
     // Filter data on CPU
     DataArray da_cpu_filtered = CPUFilter::filterArray(da);
+#ifdef MEASURE_TIME
+    auto end1 = std::chrono::high_resolution_clock::now();
+#endif
 
+
+#ifdef MEASURE_TIME
+    auto start2 = std::chrono::high_resolution_clock::now();
+#endif
     // Filter data on GPU
-//    DataArray da_gpu_filtered = GPUFilter::filterArray(da);
+    DataArray da_gpu_filtered = GPUFilter::filterArray(da);
+#ifdef MEASURE_TIME
+    auto end2 = std::chrono::high_resolution_clock::now();
+    std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
+    std::cout << "GPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2-start2).count() << " ms" << std::endl;
+#endif
 
 
-    for (size_t i = 0; i < da_cpu_filtered.size; ++i)
-    {
-        std::cout << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << std::endl;
-    }
+
+
+//    for (size_t i = 0; i < da_cpu_filtered.size; ++i)
+//    {
+//        std::cout << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << std::endl;
+//    }
 
 
     // Check if the CPU and GPU output equals

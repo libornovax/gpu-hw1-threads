@@ -3,7 +3,10 @@
 
 
 // Size of the array that is being filtered
-#define ARRAY_SIZE 100
+//#define ARRAY_SIZE 100000     // 1.6 MB
+//#define ARRAY_SIZE 1000000    // 16 MB
+#define ARRAY_SIZE 10000000   // 160 MB
+//#define ARRAY_SIZE 100000000  // 1.6 GB
 
 // Threads that will be run in each block
 #define THREADS_PER_BLOCK 32
