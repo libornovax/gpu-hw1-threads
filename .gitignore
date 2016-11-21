@@ -1,3 +1,5 @@
-bin/*
-build/*
+hw1-threads/bin/*
+hw1-threads/build/*
+hw2-filter/bin/*
+hw2-filter/bulld/*
 *.user
