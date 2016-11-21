@@ -15,7 +15,7 @@ set ( CMAKE_CXX_FLAGS "-g -std=c++11" )
 set ( DEBUG_MODE ON )
 
 find_package ( CUDA )
-list ( APPEND CUDA_NVCC_FLAGS "-arch=sm_35;-std=c++11;-DVERBOSE" )
+list ( APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_35,code=sm_35;-std=c++11;-DVERBOSE" )
 set ( CUDA_PROPAGATE_HOST_FLAGS OFF )
 
 
