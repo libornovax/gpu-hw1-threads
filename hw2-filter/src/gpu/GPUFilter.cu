@@ -48,6 +48,15 @@ DataArray filterArray (const DataArray &da)
 }
 
 
+void initialize ()
+{
+    // Just malloc a dummy in the GPU memory
+    int* gpu_dummy;
+    cudaMalloc((void**)&gpu_dummy, sizeof(int));
+    cudaFree(gpu_dummy);
+}
+
+
 }
 
 

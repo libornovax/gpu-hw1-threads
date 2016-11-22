@@ -29,6 +29,7 @@ int main (int argc, char* argv[])
 
 
 #ifdef MEASURE_TIME
+    GPUFilter::initialize();
     auto start2 = std::chrono::high_resolution_clock::now();
 #endif
     // Filter data on GPU

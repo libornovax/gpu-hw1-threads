@@ -13,6 +13,11 @@ namespace GPUFilter {
 
     DataArray filterArray (const DataArray &da);
 
+    /**
+     * @brief Initializes the CUDA environment
+     */
+    void initialize ();
+
 }
 
 
