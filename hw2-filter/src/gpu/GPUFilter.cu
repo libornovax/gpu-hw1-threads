@@ -62,7 +62,7 @@ namespace {
         }
 
         // Set last element to 0 before the downsweep phase
-        if (tid == 0) cache[2*THREADS_PER_BLOCK-1] = 0;
+        if (threadIdx.x == 0) cache[2*THREADS_PER_BLOCK-1] = 0;
 
         // Downsweep phase
         spread >>= 1;
