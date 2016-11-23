@@ -31,23 +31,22 @@ namespace {
 
 
     __global__
-    void prescan (Data *data_array_in, int length, int *data_prescan_out)
+    void prescan (Data *g_data_array_in, int length, int *g_prescan_out, int *g_block_sums_out)
     {
         // The ID of the thread - we use only one dimensional grid and blocks
         int tid = blockIdx.x*blockDim.x + threadIdx.x;
+        extern __shared__ int s_cache[];
 
         // For each Data cell determine whether it will be in the output array or not
         // We can process double the number of cells than threads - each thread reads 2 cells
-        __shared__ int cache[2*THREADS_PER_BLOCK];
-
-        cache[2*threadIdx.x]   = filter(data_array_in[2*tid].key);
-        cache[2*threadIdx.x+1] = filter(data_array_in[2*tid+1].key);
+        s_cache[2*threadIdx.x]   = filter(g_data_array_in[2*tid].key);
+        s_cache[2*threadIdx.x+1] = filter(g_data_array_in[2*tid+1].key);
 
 
         // -- PRESCAN -- //
         // Upsweep phase
         int spread = 1;
-        for (int i = THREADS_PER_BLOCK; i > 0; i >>= 1)
+        for (int i = blockDim.x; i > 0; i >>= 1)
         {
             __syncthreads();
 
@@ -55,19 +54,31 @@ namespace {
             {
                 int idx_first  = ((2*threadIdx.x+1) * spread) - 1;
                 int idx_second = ((2*threadIdx.x+2) * spread) - 1;
-                cache[idx_second] += cache[idx_first];
+                s_cache[idx_second] += s_cache[idx_first];
             }
 
             spread <<= 1; // Multiply by 2
         }
 
+        // We do not need to call __syncthreads() here because the last working thread was thread 0 and we
+        // are now using the thread 0 to clear the last element -> no incorrect synchronization can happen
+
         // Set last element to 0 before the downsweep phase
-        if (threadIdx.x == 0) cache[2*THREADS_PER_BLOCK-1] = 0;
+        if (threadIdx.x == 0)
+        {
+            // First save the total sum to the output block sums array
+            g_block_sums_out[blockIdx.x] = s_cache[2*blockDim.x-1];
+            // Now clear the value
+            s_cache[2*blockDim.x-1] = 0;
+        }
 
         // Downsweep phase
-        spread >>= 1;
-        for (int i = 1; i <= THREADS_PER_BLOCK; i <<= 1)
+        for (int i = 1; i <= blockDim.x; i <<= 1)
         {
+            // This must be before the computation because the last operation in upsweep multiplied it even
+            // more (out of bounds)
+            spread >>= 1; // Divide by 2
+
             __syncthreads();
 
             if (threadIdx.x < i)
@@ -75,20 +86,19 @@ namespace {
                 int idx_first  = ((2*threadIdx.x+1) * spread) - 1;
                 int idx_second = ((2*threadIdx.x+2) * spread) - 1;
 
-                int tmp = cache[idx_second];
+                int tmp = s_cache[idx_second];
 
-                cache[idx_second] += cache[idx_first];  // Set the right child to L+current
-                cache[idx_first]   = tmp;               // Set the left child to current
+                s_cache[idx_second] += s_cache[idx_first];  // Set the right child to L+current
+                s_cache[idx_first]   = tmp;               // Set the left child to current
             }
-
-            spread >>= 1; // Divide by 2
         }
 
         __syncthreads();
 
 
-        data_prescan_out[2*tid]   = cache[2*threadIdx.x];
-        data_prescan_out[2*tid+1] = cache[2*threadIdx.x+1];
+        // Copy data to the output array
+        g_prescan_out[2*tid]   = s_cache[2*threadIdx.x];
+        g_prescan_out[2*tid+1] = s_cache[2*threadIdx.x+1];
     }
 
 }
@@ -98,23 +108,32 @@ DataArray filterArray (const DataArray &da)
 {
     std::cout << "Filtering data with CUDA!!" << std::endl;
 
-    // Copy data to gpu
-    Data* g_data_array_in;
-    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
-    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
-    // Output data vector
-    int* g_prescan_out;
-    cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
-
     // We use only one dimensional indices of grid cells and blocks because it is easier - we have a linear
     // vector of data
     // Each block can process double the amount of data than the number of threads in it
     int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
 
-    prescan<<<num_blocks, THREADS_PER_BLOCK>>>(g_data_array_in, da.size, g_prescan_out);
+
+    // Copy data to gpu
+    Data* g_data_array_in;
+    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+
+    // Output data vector
+    int* g_prescan_out;
+    cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
+    int* g_block_sums_out;
+    cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
+
+
+    prescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
+                                                                    g_prescan_out, g_block_sums_out);
+
 
     int prescan_out[da.size];
     cudaMemcpy(prescan_out, g_prescan_out, da.size*sizeof(int), cudaMemcpyDeviceToHost);
+    int block_sums_out[num_blocks];
+    cudaMemcpy(block_sums_out, g_block_sums_out, num_blocks*sizeof(int), cudaMemcpyDeviceToHost);
 
     cudaFree(g_data_array_in);
     cudaFree(g_prescan_out);
@@ -123,6 +142,11 @@ DataArray filterArray (const DataArray &da)
     for (int i = 0; i < da.size; ++i)
     {
         std::cout << da.array[i].key << ": " << ((da.array[i].key >= FILTER_MIN && da.array[i].key <= FILTER_MAX) ? 1 : 0) << " " << prescan_out[i] << std::endl;
+    }
+
+    for (int i = 0; i < num_blocks; ++i)
+    {
+        std::cout << block_sums_out[i] << std::endl;
     }
 
 
