@@ -80,7 +80,7 @@ DataArray filterArray (const DataArray &da)
 
     for (int i = 0; i < da.size; ++i)
     {
-        std::cout << da.array[i].key << ": " << prescan_out << std::endl;
+        std::cout << da.array[i].key << ": " << prescan_out[i] << std::endl;
     }
 
 
