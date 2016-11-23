@@ -39,18 +39,14 @@ namespace {
 
         // For each Data cell determine whether it will be in the output array or not
         // We can process double the number of cells than threads - each thread reads 2 cells
-//        __shared__ int cache[2*THREADS_PER_BLOCK];
+        __shared__ int cache[2*THREADS_PER_BLOCK];
 
-//        cache[2*tid]   = data_array_in[2*tid].key;
-//        cache[2*tid+1] = data_array_in[2*tid+1].key;
-
-
-//        data_prescan_out[2*tid]   = cache[2*tid];
-//        data_prescan_out[2*tid+1] = cache[2*tid+1];
+        cache[2*tid]   = data_array_in[2*tid].key;
+        cache[2*tid+1] = data_array_in[2*tid+1].key;
 
 
-        data_prescan_out[2*tid]   = data_array_in[2*tid].key;
-        data_prescan_out[2*tid+1] = data_array_in[2*tid+1].key;
+        data_prescan_out[2*tid]   = cache[2*tid];
+        data_prescan_out[2*tid+1] = cache[2*tid+1];
     }
 
 }
@@ -63,7 +59,7 @@ DataArray filterArray (const DataArray &da)
     // Copy data to gpu
     Data* g_data_array_in;
     cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
-    cudaMemcpy(&g_data_array_in, &da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
     // Output data vector
     int* g_prescan_out;
     cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
