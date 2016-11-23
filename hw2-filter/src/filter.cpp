@@ -28,17 +28,25 @@ int main (int argc, char* argv[])
 #endif
 
 
+    if (GPUFilter::initialize())
+    {
 #ifdef MEASURE_TIME
-    GPUFilter::initialize();
-    auto start2 = std::chrono::high_resolution_clock::now();
+        auto start2 = std::chrono::high_resolution_clock::now();
 #endif
-    // Filter data on GPU
-    DataArray da_gpu_filtered = GPUFilter::filterArray(da);
+        // Filter data on GPU
+        DataArray da_gpu_filtered = GPUFilter::filterArray(da);
 #ifdef MEASURE_TIME
-    auto end2 = std::chrono::high_resolution_clock::now();
-    std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
-    std::cout << "GPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2-start2).count() << " ms" << std::endl;
+        auto end2 = std::chrono::high_resolution_clock::now();
+        std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
+        std::cout << "GPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2-start2).count() << " ms" << std::endl;
 #endif
+    }
+    else
+    {
+#ifdef MEASURE_TIME
+        std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
+#endif
+    }
 
 
 

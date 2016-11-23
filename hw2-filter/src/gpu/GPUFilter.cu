@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include "check_error.h"
 
 
 namespace GPUFilter {
@@ -48,12 +49,39 @@ DataArray filterArray (const DataArray &da)
 }
 
 
-void initialize ()
+bool initialize ()
 {
     // Just malloc a dummy in the GPU memory
     int* gpu_dummy;
     cudaMalloc((void**)&gpu_dummy, sizeof(int));
     cudaFree(gpu_dummy);
+
+
+
+    int device_count;
+    CHECK_ERROR(cudaGetDeviceCount(&device_count));
+
+    if (device_count == 0)
+    {
+        // Error, we cannot initialize
+        return false;
+    }
+    else
+    {
+        // Get properties of the device
+        cudaDeviceProp device_properties;
+        CHECK_ERROR(cudaGetDeviceProperties(&device_properties, 0));
+
+        std::cout << "Device name:           " << device_properties.name << std::endl;
+        std::cout << "Compute capability:    " << device_properties.major << "." << device_properties.minor << std::endl;
+        std::cout << "Clock rate:            " << device_properties.clockRate << std::endl;
+        std::cout << "Total global memory:   " << device_properties.totalGlobalMem << std::endl;
+        std::cout << "Multiprocessor count:  " << device_properties.multiProcessorCount << std::endl;
+        std::cout << "Max threads per block: " << device_properties.maxThreadsPerBlock << std::endl;
+        std::cout << "Max threads dim:       " << device_properties.maxThreadsDim << std::endl;
+
+        return true;
+    }
 }
 
 

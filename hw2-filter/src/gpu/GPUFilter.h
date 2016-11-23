@@ -16,7 +16,7 @@ namespace GPUFilter {
     /**
      * @brief Initializes the CUDA environment
      */
-    void initialize ();
+    bool initialize ();
 
 }
 
