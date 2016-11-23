@@ -5,12 +5,12 @@
 #include <cuda_runtime.h>
 
 
-void HandleError(cudaError_t error, const char *file, int line)
+void handle_error(cudaError_t error, const char *file, int line)
 {
     if (error != cudaSuccess)
     {
-        printf( "%s in %s at line %d\n", cudaGetErrorString( error ), file, line );
-//        exit( EXIT_FAILURE );
+        std::cout << cudaGetErrorString(error) << " in " << file << " at line " << line << std::endl;
+//        exit(EXIT_FAILURE);
     }
 }
 

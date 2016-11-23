@@ -51,13 +51,7 @@ DataArray filterArray (const DataArray &da)
 
 bool initialize ()
 {
-    // Just malloc a dummy in the GPU memory
-    int* gpu_dummy;
-    cudaMalloc((void**)&gpu_dummy, sizeof(int));
-    cudaFree(gpu_dummy);
-
-
-
+    // Find out if there is a CUDA capable device
     int device_count;
     CHECK_ERROR(cudaGetDeviceCount(&device_count));
 
@@ -78,7 +72,7 @@ bool initialize ()
         std::cout << "Total global memory:   " << device_properties.totalGlobalMem << std::endl;
         std::cout << "Multiprocessor count:  " << device_properties.multiProcessorCount << std::endl;
         std::cout << "Max threads per block: " << device_properties.maxThreadsPerBlock << std::endl;
-        std::cout << "Max threads dim:       " << device_properties.maxThreadsDim << std::endl;
+        std::cout << "Max threads dim:       " << device_properties.maxThreadsDim[0] << std::endl;
 
         return true;
     }

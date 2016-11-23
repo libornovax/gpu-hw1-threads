@@ -2,9 +2,10 @@
 #define CHECK_ERROR_H
 
 
-void HandleError(cudaError_t error, const char *file, int line);
+void handle_error(cudaError_t error, const char *file, int line);
 
-#define CHECK_ERROR( error ) ( HandleError( error, __FILE__, __LINE__ ) )
+// Macro for checking CUDA errors
+#define CHECK_ERROR(error) (handle_error(error, __FILE__, __LINE__))
 
 
 #endif // CHECK_ERROR_H
