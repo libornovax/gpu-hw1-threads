@@ -44,7 +44,8 @@ namespace {
         cache[2*threadIdx.x+1] = filter(data_array_in[2*tid+1].key);
 
 
-        // Prescan on this block
+        // -- PRESCAN -- //
+        // Upsweep phase
         int spread = 1;
         for (int i = THREADS_PER_BLOCK; i > 0; i >>= 1)
         {
@@ -57,8 +58,33 @@ namespace {
                 cache[idx_second] += cache[idx_first];
             }
 
-            spread *= 2;
+            spread <<= 1; // Multiply by 2
         }
+
+        // Set last element to 0 before the downsweep phase
+        if (tid == 0) cache[2*THREADS_PER_BLOCK-1] = 0;
+
+        // Downsweep phase
+        spread >>= 1;
+        for (int i = 1; i <= THREADS_PER_BLOCK; i <<= 1)
+        {
+            __syncthreads();
+
+            if (threadIdx.x < i)
+            {
+                int idx_first  = ((2*threadIdx.x+1) * spread) - 1;
+                int idx_second = ((2*threadIdx.x+2) * spread) - 1;
+
+                int tmp = cache[idx_second];
+
+                cache[idx_second] += cache[idx_first];  // Set the right child to L+current
+                cache[idx_first]   = tmp;               // Set the left child to current
+            }
+
+            spread >>= 1; // Divide by 2
+        }
+
+        __syncthreads();
 
 
         data_prescan_out[2*tid]   = cache[2*threadIdx.x];
