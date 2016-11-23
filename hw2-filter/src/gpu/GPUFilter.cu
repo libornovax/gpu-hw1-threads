@@ -44,6 +44,22 @@ namespace {
         cache[2*threadIdx.x+1] = filter(data_array_in[2*tid+1].key);
 
 
+        // Prescan on this block
+        int spread = 1;
+        for (int i = THREADS_PER_BLOCK; i > 0; i >>= 1)
+        {
+            __syncthreads();
+
+            if (threadIdx.x < i)
+            {
+                int idx_first = 2*threadIdx.x * spread;
+                cache[idx_first+1] += cache[idx_first];
+            }
+
+            spread *= 2;
+        }
+
+
         data_prescan_out[2*tid]   = cache[2*threadIdx.x];
         data_prescan_out[2*tid+1] = cache[2*threadIdx.x+1];
     }
@@ -79,7 +95,7 @@ DataArray filterArray (const DataArray &da)
 
     for (int i = 0; i < da.size; ++i)
     {
-        std::cout << da.array[i].key << ": " << prescan_out[i] << std::endl;
+        std::cout << da.array[i].key << ": " << ((da.array[i].key >= FILTER_MIN && da.array[i].key <= FILTER_MAX) ? 1 : 0) << " " << prescan_out[i] << std::endl;
     }
 
 
