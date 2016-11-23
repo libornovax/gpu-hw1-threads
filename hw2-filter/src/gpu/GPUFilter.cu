@@ -19,8 +19,8 @@ namespace {
     __device__
     bool filter (int key)
     {
-//        return key >= FILTER_MIN && key <= FILTER_MAX;
-        return key-FILTER_MIN <= FILTER_MAX-FILTER_MIN;
+        return key >= FILTER_MIN && key <= FILTER_MAX;
+//        return key-FILTER_MIN <= FILTER_MAX-FILTER_MIN;
     }
 
 
