@@ -52,8 +52,9 @@ namespace {
 
             if (threadIdx.x < i)
             {
-                int idx_first = 2*threadIdx.x * spread;
-                cache[idx_first+1] += cache[idx_first];
+                int idx_first  = ((2*threadIdx.x+1) * spread) - 1;
+                int idx_second = ((2*threadIdx.x+2) * spread) - 1;
+                cache[idx_second] += cache[idx_first];
             }
 
             spread *= 2;
