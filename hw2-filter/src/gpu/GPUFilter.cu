@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <vector>
 #include "settings.h"
 #include "check_error.h"
 
@@ -30,19 +31,9 @@ namespace {
 //    }
 
 
-    __global__
-    void prescan (Data *g_data_array_in, int length, int *g_prescan_out, int *g_block_sums_out)
+    __device__
+    void prescan (int tid, int *s_cache, int *g_prescan_out, int *g_block_sums_out)
     {
-        // The ID of the thread - we use only one dimensional grid and blocks
-        int tid = blockIdx.x*blockDim.x + threadIdx.x;
-        extern __shared__ int s_cache[];
-
-        // For each Data cell determine whether it will be in the output array or not
-        // We can process double the number of cells than threads - each thread reads 2 cells
-        s_cache[2*threadIdx.x]   = filter(g_data_array_in[2*tid].key);
-        s_cache[2*threadIdx.x+1] = filter(g_data_array_in[2*tid+1].key);
-
-
         // -- PRESCAN -- //
         // Upsweep phase
         int spread = 1;
@@ -101,6 +92,117 @@ namespace {
         g_prescan_out[2*tid+1] = s_cache[2*threadIdx.x+1];
     }
 
+
+    /**
+     * @brief Filters the data array and computes the indices (in each block) of the filtered elements using prescan
+     * @param g_data_array_in Array of data to be filtered
+     * @param length Length of the array of data
+     * @param g_prescan_out Indices of the filtered elements (per block)
+     * @param g_block_sums_out Numbers of filtered elements in each block
+     */
+    __global__
+    void filterPrescan (Data *g_data_array_in, int length, int *g_prescan_out, int *g_block_sums_out)
+    {
+        // The ID of the thread - we use only one dimensional grid and blocks
+        int tid = blockIdx.x*blockDim.x + threadIdx.x;
+        extern __shared__ int s_cache[];
+
+        // For each Data cell determine whether it will be in the output array or not
+        // We can process double the number of cells than threads - each thread reads 2 cells
+        s_cache[2*threadIdx.x]   = filter(g_data_array_in[2*tid].key);
+        s_cache[2*threadIdx.x+1] = filter(g_data_array_in[2*tid+1].key);
+
+        // Perform the prescan
+        prescan(tid, s_cache, g_prescan_out, g_block_sums_out);
+    }
+
+
+    __global__
+    void onlyPrescan (int *g_array_in, int length, int *g_prescan_out, int *g_block_sums_out)
+    {
+        // The ID of the thread - we use only one dimensional grid and blocks
+        int tid = blockIdx.x*blockDim.x + threadIdx.x;
+        extern __shared__ int s_cache[];
+
+        // Copy each cell into shared memory
+        s_cache[2*threadIdx.x]   = g_array_in[2*tid];
+        s_cache[2*threadIdx.x+1] = g_array_in[2*tid+1];
+
+        // Perform the prescan
+        prescan(tid, s_cache, g_prescan_out, g_block_sums_out);
+    }
+
+
+    void determineIndicesRecursive (std::vector<int*> &g_index_pyramid, int level, int level_size)
+    {
+        int num_blocks = std::ceil(level_size / (2.0*THREADS_PER_BLOCK));
+
+        int* g_block_sums_out;
+        cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
+
+        onlyPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_index_pyramid[level],
+                                                                            level_size,
+                                                                            g_index_pyramid[level],
+                                                                            g_block_sums_out);
+
+        g_index_pyramid.push_back(g_block_sums_out);
+
+        if (num_blocks > 1)
+        {
+            // Call the recursive function
+            determineIndicesRecursive(g_index_pyramid, level+1, num_blocks);
+        }
+    }
+
+
+    void determineIndices (const DataArray &da, int *g_indices_out)
+    {
+        std::vector<int*> g_index_pyramid;
+
+        // We use only one dimensional indices of grid cells and blocks because it is easier - we have a linear
+        // vector of data
+        // Each block can process double the amount of data than the number of threads in it
+        int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
+
+        // Copy data to device
+        Data* g_data_array_in;
+        cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+        cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+
+        int* g_prescan_out;
+        cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
+        int* g_block_sums_out;
+        cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
+
+        filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
+                                                                              g_prescan_out, g_block_sums_out);
+
+        g_index_pyramid.push_back(g_prescan_out);
+        g_index_pyramid.push_back(g_block_sums_out);
+
+        if (num_blocks > 1)
+        {
+            // Call the recursive function
+            determineIndicesRecursive(g_index_pyramid, 1, num_blocks);
+        }
+
+
+        int level_size = da.size;
+        for (int l = 0; l < g_index_pyramid.size(); ++l)
+        {
+            int block_sums_out[level_size];
+            cudaMemcpy(block_sums_out, g_index_pyramid[l], level_size*sizeof(int), cudaMemcpyDeviceToHost);
+
+            for (int i = 0; i < level_size; ++i) std::cout << block_sums_out[i] << std::endl;
+            std::cout << std::endl;
+
+            level_size = std::ceil(level_size / (2.0*THREADS_PER_BLOCK));
+
+            if (l != 0) cudaFree(g_index_pyramid[l]);
+        }
+
+        g_indices_out = g_index_pyramid[0];
+    }
 }
 
 
@@ -113,41 +215,43 @@ DataArray filterArray (const DataArray &da)
     // Each block can process double the amount of data than the number of threads in it
     int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
 
+    int* g_indices_out;
+    determineIndices(da, g_indices_out);
 
-    // Copy data to gpu
-    Data* g_data_array_in;
-    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
-    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+//    // Copy data to gpu
+//    Data* g_data_array_in;
+//    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+//    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
 
-    // Output data vector
-    int* g_prescan_out;
-    cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
-    int* g_block_sums_out;
-    cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
-
-
-    prescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
-                                                                    g_prescan_out, g_block_sums_out);
+//    // Output data vector
+//    int* g_prescan_out;
+//    cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
+//    int* g_block_sums_out;
+//    cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
 
 
-    int prescan_out[da.size];
-    cudaMemcpy(prescan_out, g_prescan_out, da.size*sizeof(int), cudaMemcpyDeviceToHost);
-    int block_sums_out[num_blocks];
-    cudaMemcpy(block_sums_out, g_block_sums_out, num_blocks*sizeof(int), cudaMemcpyDeviceToHost);
-
-    cudaFree(g_data_array_in);
-    cudaFree(g_prescan_out);
+//    filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
+//                                                                    g_prescan_out, g_block_sums_out);
 
 
-    for (int i = 0; i < da.size; ++i)
-    {
-        std::cout << da.array[i].key << ": " << ((da.array[i].key >= FILTER_MIN && da.array[i].key <= FILTER_MAX) ? 1 : 0) << " " << prescan_out[i] << std::endl;
-    }
+//    int prescan_out[da.size];
+//    cudaMemcpy(prescan_out, g_prescan_out, da.size*sizeof(int), cudaMemcpyDeviceToHost);
+//    int block_sums_out[num_blocks];
+//    cudaMemcpy(block_sums_out, g_block_sums_out, num_blocks*sizeof(int), cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < num_blocks; ++i)
-    {
-        std::cout << block_sums_out[i] << std::endl;
-    }
+//    cudaFree(g_data_array_in);
+//    cudaFree(g_prescan_out);
+
+
+//    for (int i = 0; i < da.size; ++i)
+//    {
+//        std::cout << da.array[i].key << ": " << ((da.array[i].key >= FILTER_MIN && da.array[i].key <= FILTER_MAX) ? 1 : 0) << " " << prescan_out[i] << std::endl;
+//    }
+
+//    for (int i = 0; i < num_blocks; ++i)
+//    {
+//        std::cout << block_sums_out[i] << std::endl;
+//    }
 
 
     return DataArray(10);
