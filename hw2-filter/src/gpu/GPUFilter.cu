@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include "settings.h"
 #include "check_error.h"
 
 
@@ -15,15 +16,37 @@ namespace {
      * @param key
      * @return
      */
-//    __device__ bool filter (int key)
+    __device__
+    bool filter (int key)
+    {
+//        return key >= FILTER_MIN && key <= FILTER_MAX;
+        return key-FILTER_MIN <= FILTER_MAX-FILTER_MIN;
+    }
+
+
+//    __global__
+//    void filterArray (Data *data_array_in, int length, Data *data_array_out)
 //    {
-//        return true;
+//        int threadId = threadIdx.x;
 //    }
 
 
-    __global__ void addNumbers (int a, int b, int *result)
+    __global__
+    void prescan (Data *data_array_in, int length, int *data_prescan_out)
     {
-        *result = a + b;
+        // The ID of the thread - we use only one dimensional grid and blocks
+        int tid = blockIdx.x*blockDim.x + threadIdx.x;
+
+        // For each Data cell determine whether it will be in the output array or not
+        // We can process double the number of cells than threads - each thread reads 2 cells
+        __shared__ int cache[2*THREADS_PER_BLOCK];
+
+        cache[2*tid]   = filter(data_array_in[2*tid].key);
+        cache[2*tid+1] = filter(data_array_in[2*tid+1].key);
+
+
+        data_prescan_out[2*tid]   = cache[2*tid];
+        data_prescan_out[2*tid+1] = cache[2*tid+1];
     }
 
 }
@@ -33,17 +56,33 @@ DataArray filterArray (const DataArray &da)
 {
     std::cout << "Filtering data with CUDA!!" << std::endl;
 
-    int result;
-    int* gpu_result;
+    // Copy data to gpu
+    Data* g_data_array_in;
+    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+    cudaMemcpy(&g_data_array_in, &da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+    // Output data vector
+    int* g_prescan_out;
+    cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
 
-    cudaMalloc((void**)&gpu_result, sizeof(int));
+    // We use only one dimensional indices of grid cells and blocks because it is easier - we have a linear
+    // vector of data
+    // Each block can process double the amount of data than the number of threads in it
+    int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
 
-    addNumbers<<<1, 1>>>(10, 15, gpu_result);
+    prescan<<<num_blocks, THREADS_PER_BLOCK>>>(g_data_array_in, da.size, g_prescan_out);
 
-    cudaMemcpy(&result, gpu_result, sizeof(int), cudaMemcpyDeviceToHost);
-    cudaFree(gpu_result);
+    int prescan_out[da.size];
+    cudaMemcpy(prescan_out, g_prescan_out, da.size*sizeof(int), cudaMemcpyDeviceToHost);
 
-    std::cout << "CUDA Result: " << result << std::endl;
+    cudaFree(g_data_array_in);
+    cudaFree(g_prescan_out);
+
+
+    for (int i = 0; i < da.size; ++i)
+    {
+        std::cout << da.array[i].key << ": " << prescan_out << std::endl;
+    }
+
 
     return DataArray(10);
 }
@@ -62,17 +101,24 @@ bool initialize ()
     }
     else
     {
+        // Copying a dummy to the device will initialize it
+        int* gpu_dummy;
+        cudaMalloc((void**)&gpu_dummy, sizeof(int));
+        cudaFree(gpu_dummy);
+
         // Get properties of the device
         cudaDeviceProp device_properties;
         CHECK_ERROR(cudaGetDeviceProperties(&device_properties, 0));
 
+        std::cout << "--------------------------------------------------------------" << std::endl;
         std::cout << "Device name:           " << device_properties.name << std::endl;
         std::cout << "Compute capability:    " << device_properties.major << "." << device_properties.minor << std::endl;
-        std::cout << "Clock rate:            " << device_properties.clockRate << std::endl;
         std::cout << "Total global memory:   " << device_properties.totalGlobalMem << std::endl;
         std::cout << "Multiprocessor count:  " << device_properties.multiProcessorCount << std::endl;
         std::cout << "Max threads per block: " << device_properties.maxThreadsPerBlock << std::endl;
         std::cout << "Max threads dim:       " << device_properties.maxThreadsDim[0] << std::endl;
+        std::cout << "Max grid size:         " << device_properties.maxGridSize[0] << std::endl;
+        std::cout << "--------------------------------------------------------------" << std::endl;
 
         return true;
     }
