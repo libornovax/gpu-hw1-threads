@@ -41,12 +41,12 @@ namespace {
         // We can process double the number of cells than threads - each thread reads 2 cells
         __shared__ int cache[2*THREADS_PER_BLOCK];
 
-        cache[2*tid]   = data_array_in[2*tid].key;
-        cache[2*tid+1] = data_array_in[2*tid+1].key;
+        cache[2*threadIdx.x]   = data_array_in[2*tid].key;
+        cache[2*threadIdx.x+1] = data_array_in[2*tid+1].key;
 
 
-        data_prescan_out[2*tid]   = cache[2*tid];
-        data_prescan_out[2*tid+1] = cache[2*tid+1];
+        data_prescan_out[2*tid]   = cache[2*threadIdx.x];
+        data_prescan_out[2*tid+1] = cache[2*threadIdx.x+1];
     }
 
 }
