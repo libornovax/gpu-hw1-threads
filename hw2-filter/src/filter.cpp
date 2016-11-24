@@ -40,6 +40,20 @@ int main (int argc, char* argv[])
         std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
         std::cout << "GPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2-start2).count() << " ms" << std::endl;
 #endif
+
+        // Check if the CPU and GPU output equals
+        if (da_cpu_filtered.size != da_gpu_filtered.size)
+        {
+            std::cout << "ERROR: Length of CPU (" << da_cpu_filtered.size << ") and GPU (" << da_gpu_filtered.size << ") filtered data are not the same." << std::endl;
+        }
+        for (size_t i = 0; i < da_cpu_filtered.size; ++i)
+        {
+            if (da_cpu_filtered.array[i].key != da_gpu_filtered.array[i].key ||
+                    da_cpu_filtered.array[i].data != da_gpu_filtered.array[i].data)
+            {
+                std::cout << "ERROR: Data entry from CPU (" << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << ") and GPU (" << da_gpu_filtered.array[i].key << ": " << da_gpu_filtered.array[i].data << ") data is not the same." << std::endl;
+            }
+        }
     }
     else
     {
@@ -57,19 +71,7 @@ int main (int argc, char* argv[])
 //    }
 
 
-    // Check if the CPU and GPU output equals
-//    if (da_cpu_filtered.size != da_gpu_filtered.size)
-//    {
-//        std::cout << "ERROR: Length of CPU (" << da_cpu_filtered.size << ") and GPU (" << da_gpu_filtered.size << ") filtered data are not the same." << std::endl;
-//    }
-//    for (size_t i = 0; i < da_cpu_filtered.size; ++i)
-//    {
-//        if (da_cpu_filtered.array[i].key != da_gpu_filtered.array[i].key ||
-//                da_cpu_filtered.array[i].data != da_gpu_filtered.array[i].data)
-//        {
-//            std::cout << "ERROR: Data entry from CPU (" << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << ") and GPU (" << da_gpu_filtered.array[i].key << ": " << da_gpu_filtered.array[i].data << ") data is not the same." << std::endl;
-//        }
-//    }
+
 
 
     return EXIT_SUCCESS;

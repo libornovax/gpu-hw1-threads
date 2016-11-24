@@ -245,12 +245,14 @@ DataArray filterArray (const DataArray &da)
     DataArray out(output_size);
     cudaMemcpy(out.array, g_da, output_size*sizeof(Data), cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < da.size; ++i)
-    {
-        std::cout << out.array[i].key << std::endl;
-    }
 
-    std::cout << "Output size: " << output_size << std::endl;
+//    for (int i = 0; i < output_size; ++i)
+//    {
+//        std::cout << out.array[i].key << std::endl;
+//    }
+
+//    std::cout << "Output size: " << output_size << std::endl;
+
 
 
 //    // Copy data to gpu
