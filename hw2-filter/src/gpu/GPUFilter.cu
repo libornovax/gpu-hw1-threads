@@ -231,14 +231,19 @@ DataArray filterArray (const DataArray &da)
     determineIndices(da, g_indices_out, output_size);
 
 
+    Data* g_data_array_in;
+    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+
+
     Data* g_da;
     cudaMalloc((void**)&g_da, output_size*sizeof(Data));
 
-    copyElementsToOutput<<<2*num_blocks, THREADS_PER_BLOCK>>>(da.array, g_indices_out, g_da);
+    copyElementsToOutput<<<2*num_blocks, THREADS_PER_BLOCK>>>(g_data_array_in, g_indices_out, g_da);
 
 
     DataArray out(output_size);
-    cudaMemcpy(out.array, g_da, da.size*sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(out.array, g_da, output_size*sizeof(Data), cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < da.size; ++i)
     {
