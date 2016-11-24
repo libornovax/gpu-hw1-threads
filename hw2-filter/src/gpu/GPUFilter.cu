@@ -12,22 +12,34 @@ namespace GPUFilter {
 
 namespace {
 
+    /**
+     * @brief Recursively prescans and fills the pyramid of indices
+     * @param g_index_pyramid
+     * @param level_sizes
+     * @param level Current level that we are working on
+     * @param level_size Size (length) of the array of elements in the current level
+     */
     void determineIndicesRecursive (std::vector<int*> &g_index_pyramid, std::vector<int> &level_sizes,
                                     int level, int level_size)
     {
-        int num_blocks = std::ceil(level_size / (2.0*THREADS_PER_BLOCK));
+        int shared_mem_size = 2 * THREADS_PER_BLOCK;
+        int num_blocks = std::ceil(double(level_size) / shared_mem_size);
 
-        int* g_block_sums_out;
-        cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
+        // Allocate memory for the block sums
+        int* g_block_sums_out; cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
 
-        onlyPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_index_pyramid[level],
-                                                                            level_size,
-                                                                            g_index_pyramid[level],
-                                                                            g_block_sums_out);
+        // Here we call only prescan (without filter) because we need only to compute the sums
+        // The values in the current level of the pyramid get replaced by the partial sums
+        onlyPrescan<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_index_pyramid[level],
+                                                                          level_size,
+                                                                          g_index_pyramid[level],
+                                                                          g_block_sums_out);
 
+        // Add the block sum values to the pyramid as a new level
         g_index_pyramid.push_back(g_block_sums_out);
         level_sizes.push_back(num_blocks);
 
+        // If there is only one block we are in the top of the pyramid
         if (num_blocks > 1)
         {
             // Call the recursive function
@@ -36,33 +48,42 @@ namespace {
     }
 
 
-    void firstPyramidLevel (const DataArray &da, int *g_indices_out, std::vector<int*> &g_index_pyramid,
-                            std::vector<int> &level_sizes)
+    /**
+     * @brief Fills the 0 and 1st levels of the index pyramid
+     * These levels need to be done separately because we have to call the filter() function on each
+     * input element
+     * @param da Input data array
+     * @param g_indices_out
+     * @param g_index_pyramid_out
+     * @param level_sizes_out
+     */
+    void firstPyramidLevel (const DataArray &da, int *g_indices_out, std::vector<int*> &g_index_pyramid_out,
+                            std::vector<int> &level_sizes_out)
     {
-        // Each block can process double the amount of data than the number of threads in it
-        int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
-
-        // Copy data to GPU
-        Data* g_data_array_in;
-        cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+        // Copy input data to GPU
+        Data* g_data_array_in; cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
         cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+
+        // Each block can process double the amount of data than the number of threads in it
+        int shared_mem_size = 2 * THREADS_PER_BLOCK;
+        int num_blocks = std::ceil(double(da.size) / shared_mem_size);
 
         // Array for block sums of the first level
         int* g_block_sums_out;
         cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
 
-
         // We need to first call kernel with filter function, which filters the elements of the input
         // array - marks the ones we want to keep. Then, prescan on the 0/1 membership array determines
         // indices within each block
-        filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
-                                                                              g_indices_out,
-                                                                              g_block_sums_out);
-
+        filterPrescan<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_data_array_in, da.size,
+                                                                            g_indices_out,
+                                                                            g_block_sums_out);
 
         // Store the results in the pyramid
-        g_index_pyramid.push_back(g_indices_out); level_sizes.push_back(da.size);
-        g_index_pyramid.push_back(g_block_sums_out); level_sizes.push_back(num_blocks);
+        // Level 0 is of size da.size and contains partial indices of the of the filtered output
+        g_index_pyramid_out.push_back(g_indices_out); level_sizes_out.push_back(da.size);
+        // Level 1 contains numbers of filtered elements in each block from the level 0 computation
+        g_index_pyramid_out.push_back(g_block_sums_out); level_sizes_out.push_back(num_blocks);
     }
 
 
@@ -86,12 +107,13 @@ namespace {
         std::vector<int*> g_index_pyramid;
         std::vector<int>  level_sizes;  // Because we want to support arrays of arbitrary sizes - store them
 
-
+        // Fill the 0 and 1 pyramid level, from level 1 we can call regular prescan of the values because we
+        // do not need to filter them anymore
         firstPyramidLevel(da, g_indices_out, g_index_pyramid, level_sizes);
 
         if (level_sizes.back() > 1)
         {
-            // Call the recursive function
+            // Call the recursive prescan function
             determineIndicesRecursive(g_index_pyramid, level_sizes, 1, level_sizes.back());
         }
 
@@ -102,10 +124,14 @@ namespace {
         cudaMemcpy(&output_size, g_index_pyramid[g_index_pyramid.size()-1], sizeof(int), cudaMemcpyDeviceToHost);
         cudaFree(g_index_pyramid[g_index_pyramid.size()-1]);
 
+
+        // After the whole pyramid is built we need to propagate the prescan sums all the way to the bottom
+        // and add them to the partial indices
         for (int l = g_index_pyramid.size()-2; l > 0; --l)
         {
-            int nbl = std::ceil(double(level_sizes[l-1]) / THREADS_PER_BLOCK);
-            propagateSum<<<nbl, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1], level_sizes[l-1]);
+            int num_blocks = std::ceil(double(level_sizes[l-1]) / THREADS_PER_BLOCK);
+            propagateSum<<< num_blocks, THREADS_PER_BLOCK >>>(g_index_pyramid[l], g_index_pyramid[l-1],
+                                                              level_sizes[l-1]);
 
             if (l != 0) cudaFree(g_index_pyramid[l]);
         }
