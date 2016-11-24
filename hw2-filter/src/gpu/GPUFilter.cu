@@ -193,29 +193,16 @@ namespace {
         cudaMemcpy(&output_size_out, g_index_pyramid[g_index_pyramid.size()-1], sizeof(int), cudaMemcpyDeviceToHost);
 
 
-//        int level_size = 1;
-//        for (int l = g_index_pyramid.size()-2; l > 0; --l)
-//        {
-//             int block_sums_out[level_size];
-//                cudaMemcpy(block_sums_out, g_index_pyramid[l], level_size*sizeof(int), cudaMemcpyDeviceToHost);
+        int level_size = 1;
+        for (int l = g_index_pyramid.size()-2; l > 0; --l)
+        {
+            propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
+                                                              level_size);
 
-//                for (int i = 0; i < level_size; ++i) std::cout << block_sums_out[i] << std::endl;
-//                std::cout << std::endl;
+            level_size = level_size * 2*THREADS_PER_BLOCK;
 
-
-
-
-
-////            propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
-////                                                              level_size);
-
-//            level_size = level_size * 2*THREADS_PER_BLOCK;
-
-////            if (l != 0) cudaFree(g_index_pyramid[l]);
-//        }
-
-
-//        g_indices_out = g_index_pyramid[0];
+            if (l != 0) cudaFree(g_index_pyramid[l]);
+        }
     }
 }
 
