@@ -53,6 +53,10 @@ int main (int argc, char* argv[])
             {
                 std::cout << "ERROR: Data entry from CPU (" << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << ") and GPU (" << da_gpu_filtered.array[i].key << ": " << da_gpu_filtered.array[i].data << ") data is not the same." << std::endl;
             }
+            else
+            {
+                std::cout << "(" << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << ")  (" << da_gpu_filtered.array[i].key << ": " << da_gpu_filtered.array[i].data << ")" << std::endl;
+            }
         }
     }
     else
