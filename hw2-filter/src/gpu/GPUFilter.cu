@@ -174,15 +174,13 @@ namespace {
         cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
         cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
 
-        int* g_prescan_out;
-        cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
         int* g_block_sums_out;
         cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
 
         filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
-                                                                              g_prescan_out, g_block_sums_out);
+                                                                              g_indices_out, g_block_sums_out);
 
-        g_index_pyramid.push_back(g_prescan_out);
+        g_index_pyramid.push_back(g_indices_out);
         g_index_pyramid.push_back(g_block_sums_out);
 
         if (num_blocks > 1)
@@ -195,29 +193,29 @@ namespace {
         cudaMemcpy(&output_size_out, g_index_pyramid[g_index_pyramid.size()-1], sizeof(int), cudaMemcpyDeviceToHost);
 
 
-        int level_size = 1;
-        for (int l = g_index_pyramid.size()-2; l > 0; --l)
-        {
-             int block_sums_out[level_size];
-                cudaMemcpy(block_sums_out, g_index_pyramid[l], level_size*sizeof(int), cudaMemcpyDeviceToHost);
+//        int level_size = 1;
+//        for (int l = g_index_pyramid.size()-2; l > 0; --l)
+//        {
+//             int block_sums_out[level_size];
+//                cudaMemcpy(block_sums_out, g_index_pyramid[l], level_size*sizeof(int), cudaMemcpyDeviceToHost);
 
-                for (int i = 0; i < level_size; ++i) std::cout << block_sums_out[i] << std::endl;
-                std::cout << std::endl;
-
-
+//                for (int i = 0; i < level_size; ++i) std::cout << block_sums_out[i] << std::endl;
+//                std::cout << std::endl;
 
 
 
-//            propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
-//                                                              level_size);
-
-            level_size = level_size * 2*THREADS_PER_BLOCK;
-
-//            if (l != 0) cudaFree(g_index_pyramid[l]);
-        }
 
 
-        g_indices_out = g_index_pyramid[0];
+////            propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
+////                                                              level_size);
+
+//            level_size = level_size * 2*THREADS_PER_BLOCK;
+
+////            if (l != 0) cudaFree(g_index_pyramid[l]);
+//        }
+
+
+//        g_indices_out = g_index_pyramid[0];
     }
 }
 
@@ -232,6 +230,7 @@ DataArray filterArray (const DataArray &da)
     int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
 
     int* g_indices_out;
+    cudaMalloc((void**)&g_indices_out, da.size*sizeof(int));
     int output_size;
     determineIndices(da, g_indices_out, output_size);
 
