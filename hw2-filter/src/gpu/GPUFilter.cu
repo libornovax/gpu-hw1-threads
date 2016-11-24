@@ -57,12 +57,12 @@ namespace {
      * @param g_index_pyramid_out
      * @param level_sizes_out
      */
-    void firstPyramidLevel (const DataArray &da, int *g_indices_out, std::vector<int*> &g_index_pyramid_out,
+    void firstPyramidLevel (Data* g_da_in, const DataArray &da, int *g_indices_out, std::vector<int*> &g_index_pyramid_out,
                             std::vector<int> &level_sizes_out)
     {
         // Copy input data to GPU
-        Data* g_data_array_in; cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
-        cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+//        Data* g_data_array_in; cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+//        cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
 
         // Each block can process double the amount of data than the number of threads in it
         int shared_mem_size = 2 * THREADS_PER_BLOCK;
@@ -75,7 +75,7 @@ namespace {
         // We need to first call kernel with filter function, which filters the elements of the input
         // array - marks the ones we want to keep. Then, prescan on the 0/1 membership array determines
         // indices within each block
-        filterPrescan<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_data_array_in, da.size,
+        filterPrescan<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_da_in, da.size,
                                                                             g_indices_out,
                                                                             g_block_sums_out);
 
@@ -93,7 +93,7 @@ namespace {
      * @param g_indices_out Output, array of size da.size with filtered element indices
      * @return Total number of filtered elements
      */
-    int determineIndices (const DataArray &da, int *g_indices_out)
+    int determineIndices (Data* g_da_in, const DataArray &da, int *g_indices_out)
     {
         // The indices will be determined by prescan. The prescan must be parallel on the GPU and recursive
         // on CPU - if the output of the prescan cannot fit in one block then we have to recursively call
@@ -109,7 +109,7 @@ namespace {
 
         // Fill the 0 and 1 pyramid level, from level 1 we can call regular prescan of the values because we
         // do not need to filter them anymore
-        firstPyramidLevel(da, g_indices_out, g_index_pyramid, level_sizes);
+        firstPyramidLevel(g_da_in, da, g_indices_out, g_index_pyramid, level_sizes);
 
         if (level_sizes.back() > 1)
         {
@@ -148,12 +148,13 @@ DataArray filterArray (const DataArray &da)
     int* g_indices_out;
     cudaMalloc((void**)&g_indices_out, da.size*sizeof(int));
 
-    int output_size = determineIndices(da, g_indices_out);
 
 
     // Copy data to GPU
     Data* g_da_in; cudaMalloc((void**)&g_da_in, da.size*sizeof(Data));
     cudaMemcpy(g_da_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+
+    int output_size = determineIndices(g_da_in, da, g_indices_out);
 
     // Copy data to the output array
     Data* g_da_out; cudaMalloc((void**)&g_da_out, output_size*sizeof(Data));
