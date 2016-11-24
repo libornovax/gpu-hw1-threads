@@ -16,6 +16,7 @@
 
 int main (int argc, char* argv[])
 {
+    std::cout << "-- ARRAY SIZE: " << ARRAY_SIZE << " (" << (double(ARRAY_SIZE*sizeof(Data))/(1024*1024)) << " MB)" << std::endl;
     DataArray da = ArrayGenerator::generateRandomArray(ARRAY_SIZE);
 
 #ifdef MEASURE_TIME

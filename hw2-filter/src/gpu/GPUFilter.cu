@@ -158,7 +158,7 @@ DataArray filterArray (const DataArray &da)
     Data* g_da_out; cudaMalloc((void**)&g_da_out, output_size*sizeof(Data));
 
     int num_blocks = std::ceil(double(da.size) / THREADS_PER_BLOCK);
-    copyElementsToOutput<<<num_blocks, THREADS_PER_BLOCK>>>(g_da_in, da.size, g_indices_out, g_da_out);
+    copyElementsToOutput<<< num_blocks, THREADS_PER_BLOCK >>>(g_da_in, da.size, g_indices_out, g_da_out);
 
 
     DataArray da_out(output_size);
@@ -178,7 +178,11 @@ bool initialize ()
     int device_count;
     CHECK_ERROR(cudaGetDeviceCount(&device_count));
 
-    if (device_count == 0)
+    // Get properties of the device
+    cudaDeviceProp device_properties;
+    CHECK_ERROR(cudaGetDeviceProperties(&device_properties, 0));
+
+    if (device_count == 0 || (device_properties.major == 0 && device_properties.minor == 0))
     {
         // Error, we cannot initialize
         return false;
@@ -189,10 +193,6 @@ bool initialize ()
         int* gpu_dummy;
         cudaMalloc((void**)&gpu_dummy, sizeof(int));
         cudaFree(gpu_dummy);
-
-        // Get properties of the device
-        cudaDeviceProp device_properties;
-        CHECK_ERROR(cudaGetDeviceProperties(&device_properties, 0));
 
         std::cout << "--------------------------------------------------------------" << std::endl;
         std::cout << "Device name:           " << device_properties.name << std::endl;
