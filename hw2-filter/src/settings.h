@@ -8,7 +8,7 @@
 //#define ARRAY_SIZE 1000000    // 8 MB
 //#define ARRAY_SIZE 10000000   // 80 MB
 //#define ARRAY_SIZE 100000000  // 800 MB
-//#define ARRAY_SIZE 1000000000 // 1.6 GB
+//#define ARRAY_SIZE 200000000  // 1.6 GB
 
 // Threads that will run in each block
 #define THREADS_PER_BLOCK 32
