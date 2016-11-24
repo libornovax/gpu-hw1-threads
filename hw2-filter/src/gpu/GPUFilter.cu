@@ -193,7 +193,7 @@ namespace {
         cudaMemcpy(&output_size_out, g_index_pyramid[g_index_pyramid.size()-1], sizeof(int), cudaMemcpyDeviceToHost);
 
 
-        int level_size = 1;
+        int level_size = THREADS_PER_BLOCK;
         for (int l = g_index_pyramid.size()-2; l > 0; --l)
         {
             propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
