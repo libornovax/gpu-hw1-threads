@@ -16,7 +16,7 @@ __global__
 void propagateSum (int *g_level_top, int *g_level_bottom, int top_level_size);
 
 __global__
-void copyElementsToOutput (Data *g_da, int *g_indices, Data *g_da_out);
+void copyElementsToOutput (Data *g_da, int length, int *g_indices, Data *g_da_out);
 
 
 #endif // KERNELS_H

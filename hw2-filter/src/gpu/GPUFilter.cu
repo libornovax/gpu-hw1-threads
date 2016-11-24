@@ -89,10 +89,10 @@ namespace {
 
         firstPyramidLevel(da, g_indices_out, g_index_pyramid, level_sizes);
 
-        if (num_blocks > 1)
+        if (level_sizes.back() > 1)
         {
             // Call the recursive function
-            determineIndicesRecursive(g_index_pyramid, level_sizes, 1, num_blocks);
+            determineIndicesRecursive(g_index_pyramid, level_sizes, 1, level_sizes.back());
         }
 
 
@@ -122,7 +122,7 @@ DataArray filterArray (const DataArray &da)
     int* g_indices_out;
     cudaMalloc((void**)&g_indices_out, da.size*sizeof(int));
 
-    int output_size = determineIndices(da, g_indices_out, output_size);
+    int output_size = determineIndices(da, g_indices_out);
 
 
     // Copy data to GPU
