@@ -153,19 +153,24 @@ namespace {
     }
 
 
-    void determineIndices (Data *g_data_array_in, int length, int *g_indices_out, int &output_size_out)
+    void determineIndices (const DataArray &da, int *g_indices_out, int &output_size_out)
     {
         std::vector<int*> g_index_pyramid;
 
         // We use only one dimensional indices of grid cells and blocks because it is easier - we have a linear
         // vector of data
         // Each block can process double the amount of data than the number of threads in it
-        int num_blocks = std::ceil(length / (2.0*THREADS_PER_BLOCK));
+        int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
+
+        // Copy data to GPU
+        Data* g_data_array_in;
+        cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+        cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
 
         int* g_block_sums_out;
         cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
 
-        filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, length,
+        filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
                                                                               g_indices_out, g_block_sums_out);
 
         g_index_pyramid.push_back(g_indices_out);
@@ -208,17 +213,18 @@ DataArray filterArray (const DataArray &da)
 {
     std::cout << "Filtering data with CUDA!!" << std::endl;
 
-    // Copy data to GPU
-    Data* g_data_array_in;
-    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
-    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+
 
     // Compute indices of elements in the output array - scan
     int* g_indices_out;
     cudaMalloc((void**)&g_indices_out, da.size*sizeof(int));
     int output_size;
-    determineIndices(g_data_array_in, da.size, g_indices_out, output_size);
+    determineIndices(da, g_indices_out, output_size);
 
+    // Copy data to GPU
+    Data* g_data_array_in;
+    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
+    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
 
     // Copy data to the output array
     Data* g_da;
