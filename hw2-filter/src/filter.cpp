@@ -63,16 +63,5 @@ int main (int argc, char* argv[])
     }
 
 
-
-
-//    for (size_t i = 0; i < da_cpu_filtered.size; ++i)
-//    {
-//        std::cout << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << std::endl;
-//    }
-
-
-
-
-
     return EXIT_SUCCESS;
 }

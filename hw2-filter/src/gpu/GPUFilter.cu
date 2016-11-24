@@ -86,13 +86,6 @@ namespace {
     }
 
 
-    /**
-     * @brief Filters the data array and computes the indices (in each block) of the filtered elements using prescan
-     * @param g_data_array_in Array of data to be filtered
-     * @param length Length of the array of data
-     * @param g_prescan_out Indices of the filtered elements (per block)
-     * @param g_block_sums_out Numbers of filtered elements in each block
-     */
     __global__
     void filterPrescan (Data *g_data_array_in, int length, int *g_prescan_out, int *g_block_sums_out)
     {
@@ -160,24 +153,19 @@ namespace {
     }
 
 
-    void determineIndices (const DataArray &da, int *g_indices_out, int &output_size_out)
+    void determineIndices (Data *g_data_array_in, int length, int *g_indices_out, int &output_size_out)
     {
         std::vector<int*> g_index_pyramid;
 
         // We use only one dimensional indices of grid cells and blocks because it is easier - we have a linear
         // vector of data
         // Each block can process double the amount of data than the number of threads in it
-        int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
-
-        // Copy data to device
-        Data* g_data_array_in;
-        cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
-        cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
+        int num_blocks = std::ceil(length / (2.0*THREADS_PER_BLOCK));
 
         int* g_block_sums_out;
         cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
 
-        filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
+        filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, length,
                                                                               g_indices_out, g_block_sums_out);
 
         g_index_pyramid.push_back(g_indices_out);
@@ -220,75 +208,28 @@ DataArray filterArray (const DataArray &da)
 {
     std::cout << "Filtering data with CUDA!!" << std::endl;
 
-    // We use only one dimensional indices of grid cells and blocks because it is easier - we have a linear
-    // vector of data
-    // Each block can process double the amount of data than the number of threads in it
-    int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
-
-    int* g_indices_out;
-    cudaMalloc((void**)&g_indices_out, da.size*sizeof(int));
-    int output_size;
-    determineIndices(da, g_indices_out, output_size);
-
-
+    // Copy data to GPU
     Data* g_data_array_in;
     cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
     cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
 
+    // Compute indices of elements in the output array - scan
+    int* g_indices_out;
+    cudaMalloc((void**)&g_indices_out, da.size*sizeof(int));
+    int output_size;
+    determineIndices(g_data_array_in, da.size, g_indices_out, output_size);
 
+
+    // Copy data to the output array
     Data* g_da;
     cudaMalloc((void**)&g_da, output_size*sizeof(Data));
 
+    int num_blocks = std::ceil(da.size / (2.0*THREADS_PER_BLOCK));
     copyElementsToOutput<<<2*num_blocks, THREADS_PER_BLOCK>>>(g_data_array_in, g_indices_out, g_da);
 
 
     DataArray out(output_size);
     cudaMemcpy(out.array, g_da, output_size*sizeof(Data), cudaMemcpyDeviceToHost);
-
-
-//    for (int i = 0; i < output_size; ++i)
-//    {
-//        std::cout << out.array[i].key << std::endl;
-//    }
-
-//    std::cout << "Output size: " << output_size << std::endl;
-
-
-
-//    // Copy data to gpu
-//    Data* g_data_array_in;
-//    cudaMalloc((void**)&g_data_array_in, da.size*sizeof(Data));
-//    cudaMemcpy(g_data_array_in, da.array, da.size*sizeof(Data), cudaMemcpyHostToDevice);
-
-//    // Output data vector
-//    int* g_prescan_out;
-//    cudaMalloc((void**)&g_prescan_out, da.size*sizeof(int));
-//    int* g_block_sums_out;
-//    cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
-
-
-//    filterPrescan<<<num_blocks, THREADS_PER_BLOCK, 2*THREADS_PER_BLOCK>>>(g_data_array_in, da.size,
-//                                                                    g_prescan_out, g_block_sums_out);
-
-
-//    int prescan_out[da.size];
-//    cudaMemcpy(prescan_out, g_prescan_out, da.size*sizeof(int), cudaMemcpyDeviceToHost);
-//    int block_sums_out[num_blocks];
-//    cudaMemcpy(block_sums_out, g_block_sums_out, num_blocks*sizeof(int), cudaMemcpyDeviceToHost);
-
-//    cudaFree(g_data_array_in);
-//    cudaFree(g_prescan_out);
-
-
-//    for (int i = 0; i < da.size; ++i)
-//    {
-//        std::cout << da.array[i].key << ": " << ((da.array[i].key >= FILTER_MIN && da.array[i].key <= FILTER_MAX) ? 1 : 0) << " " << prescan_out[i] << std::endl;
-//    }
-
-//    for (int i = 0; i < num_blocks; ++i)
-//    {
-//        std::cout << block_sums_out[i] << std::endl;
-//    }
 
 
     return out;
