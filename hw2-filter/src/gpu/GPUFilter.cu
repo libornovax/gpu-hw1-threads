@@ -132,11 +132,11 @@ namespace {
         int bottom_level_size = top_level_size*2*THREADS_PER_BLOCK;
         int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-        if (tid >= bottom_level_size/2)
-        {
-            int top_id = tid / (2*THREADS_PER_BLOCK);
+        int top_id = tid / (2*THREADS_PER_BLOCK);
 
-            g_level_bottom[tid] += g_level_top[top_id];
+        if (top_id > 0)
+        {
+            g_level_bottom[tid] += g_level_top[top_id-1];
         }
     }
 
