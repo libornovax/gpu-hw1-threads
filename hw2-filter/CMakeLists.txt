@@ -32,6 +32,7 @@ file ( GLOB MY_SOURCES src/*.cpp
 file ( GLOB CU_SOURCES src/gpu/*.cu
                         )
 
+
 cuda_add_executable ( filter
     ${MY_HEADERS}
     ${MY_SOURCES}
