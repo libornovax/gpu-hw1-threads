@@ -129,15 +129,12 @@ namespace {
     __global__
     void propagateSum (int *g_level_top, int *g_level_bottom, int top_level_size)
     {
-        int bottom_level_size = top_level_size*2*THREADS_PER_BLOCK;
+//        int bottom_level_size = top_level_size*2*THREADS_PER_BLOCK;
         int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
         int top_id = tid / (2*THREADS_PER_BLOCK);
 
-        if (top_id > 0)
-        {
-            g_level_bottom[tid] += g_level_top[top_id-1];
-        }
+        g_level_bottom[tid] += g_level_top[top_id];
     }
 
 
@@ -201,12 +198,22 @@ namespace {
         int level_size = 1;
         for (int l = g_index_pyramid.size()-2; l > 0; --l)
         {
-            propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
-                                                              level_size);
+             int block_sums_out[level_size];
+                cudaMemcpy(block_sums_out, g_index_pyramid[l], level_size*sizeof(int), cudaMemcpyDeviceToHost);
+
+                for (int i = 0; i < level_size; ++i) std::cout << block_sums_out[i] << std::endl;
+                std::cout << std::endl;
+
+
+
+
+
+//            propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
+//                                                              level_size);
 
             level_size = level_size * 2*THREADS_PER_BLOCK;
 
-            if (l != 0) cudaFree(g_index_pyramid[l]);
+//            if (l != 0) cudaFree(g_index_pyramid[l]);
         }
 
 
