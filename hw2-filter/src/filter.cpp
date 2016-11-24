@@ -17,6 +17,7 @@
 int main (int argc, char* argv[])
 {
     std::cout << "-- ARRAY SIZE: " << ARRAY_SIZE << " (" << (double(ARRAY_SIZE*sizeof(Data))/(1024*1024)) << " MB)" << std::endl;
+    std::cout << "-- BLOCK SIZE: " << THREADS_PER_BLOCK << " threads" << std::endl;
 
     DataArray da = ArrayGenerator::generateRandomArray(ARRAY_SIZE);
 
@@ -48,14 +49,17 @@ int main (int argc, char* argv[])
         {
             std::cout << "ERROR: Length of CPU (" << da_cpu_filtered.size << ") and GPU (" << da_gpu_filtered.size << ") filtered data are not the same." << std::endl;
         }
+        int num_errors = 0;
         for (size_t i = 0; i < da_cpu_filtered.size; ++i)
         {
             if (da_cpu_filtered.array[i].key != da_gpu_filtered.array[i].key ||
                     da_cpu_filtered.array[i].data != da_gpu_filtered.array[i].data)
             {
                 std::cout << "ERROR: Data entry from CPU (" << da_cpu_filtered.array[i].key << ": " << da_cpu_filtered.array[i].data << ") and GPU (" << da_gpu_filtered.array[i].key << ": " << da_gpu_filtered.array[i].data << ") data is not the same." << std::endl;
+                num_errors++;
             }
         }
+        if (num_errors == 0) std::cout << "-- CONGRATULATIONS! GPU solution is correct!" << std::endl;
     }
     else
     {
