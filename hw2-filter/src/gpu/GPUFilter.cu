@@ -12,7 +12,8 @@ namespace GPUFilter {
 
 namespace {
 
-    void determineIndicesRecursive (std::vector<int*> &g_index_pyramid, int level, int level_size)
+    void determineIndicesRecursive (std::vector<int*> &g_index_pyramid, std::vector<int> &level_sizes,
+                                    int level, int level_size)
     {
         int num_blocks = std::ceil(level_size / (2.0*THREADS_PER_BLOCK));
 
@@ -25,11 +26,12 @@ namespace {
                                                                             g_block_sums_out);
 
         g_index_pyramid.push_back(g_block_sums_out);
+        level_sizes.push_back(num_blocks);
 
         if (num_blocks > 1)
         {
             // Call the recursive function
-            determineIndicesRecursive(g_index_pyramid, level+1, num_blocks);
+            determineIndicesRecursive(g_index_pyramid, level_sizes, level+1, num_blocks);
         }
     }
 
@@ -37,6 +39,7 @@ namespace {
     void determineIndices (const DataArray &da, int *g_indices_out, int &output_size_out)
     {
         std::vector<int*> g_index_pyramid;
+        std::vector<int>  level_sizes;
 
         // We use only one dimensional indices of grid cells and blocks because it is easier - we have a linear
         // vector of data
@@ -56,24 +59,27 @@ namespace {
 
         g_index_pyramid.push_back(g_indices_out);
         g_index_pyramid.push_back(g_block_sums_out);
+        level_sizes.push_back(da.size);
+        level_sizes.push_back(num_blocks);
 
         if (num_blocks > 1)
         {
             // Call the recursive function
-            determineIndicesRecursive(g_index_pyramid, 1, num_blocks);
+            determineIndicesRecursive(g_index_pyramid, level_sizes, 1, num_blocks);
         }
 
 
         cudaMemcpy(&output_size_out, g_index_pyramid[g_index_pyramid.size()-1], sizeof(int), cudaMemcpyDeviceToHost);
 
 
-        int level_size = 2*THREADS_PER_BLOCK;
+//        int level_size = 2*THREADS_PER_BLOCK;
         for (int l = g_index_pyramid.size()-2; l > 0; --l)
         {
-            propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
-                                                              level_size);
+            int nbl = std::ceil(double(level_sizes[l]) / THREADS_PER_BLOCK);
+            propagateSum<<<nbl, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
+                                                              level_sizes[l-1]);
 
-            level_size = level_size * 2*THREADS_PER_BLOCK;
+//            level_size = level_size * 2*THREADS_PER_BLOCK;
 
             if (l != 0) cudaFree(g_index_pyramid[l]);
         }

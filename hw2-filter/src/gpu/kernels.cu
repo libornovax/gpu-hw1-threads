@@ -24,7 +24,7 @@ namespace {
 
     /**
      * @brief Prescan algorithm (exclusive scan) implementation for GPU
-     * @param s_cache Array that we want to prescan (size is 2*blockDim.x, blockDim.x has to be a power of 2!)
+     * @param s_cache Array that we want to prescan (size is 2*blockDim.x, blockDim.x has to be 2^n!)
      * @param g_block_sums_out Array of block sums
      */
     __device__
@@ -102,15 +102,17 @@ void filterPrescan (Data *g_data_array_in, int length, int *g_prescan_out, int *
 
     // For each Data cell determine whether it will be in the output array or not
     // We can process double the number of cells than threads - each thread reads 2 cells
-    s_cache[2*threadIdx.x]   = filter(g_data_array_in[2*tid].key);
-    s_cache[2*threadIdx.x+1] = filter(g_data_array_in[2*tid+1].key);
+    if (2*threadIdx.x < length)   s_cache[2*threadIdx.x]   = filter(g_data_array_in[2*tid].key);
+    else                          s_cache[2*threadIdx.x]   = 0;
+    if (2*threadIdx.x+1 < length) s_cache[2*threadIdx.x+1] = filter(g_data_array_in[2*tid+1].key);
+    else                          s_cache[2*threadIdx.x+1] = 0;
 
     // Perform the prescan
     prescan(s_cache, g_block_sums_out);
 
     // Copy data to the output array
-    g_prescan_out[2*tid]   = s_cache[2*threadIdx.x];
-    g_prescan_out[2*tid+1] = s_cache[2*threadIdx.x+1];
+    if (2*threadIdx.x < length)   g_prescan_out[2*tid]   = s_cache[2*threadIdx.x];
+    if (2*threadIdx.x+1 < length) g_prescan_out[2*tid+1] = s_cache[2*threadIdx.x+1];
 }
 
 
@@ -122,27 +124,32 @@ void onlyPrescan (int *g_array_in, int length, int *g_prescan_out, int *g_block_
     extern __shared__ int s_cache[];
 
     // Copy each cell into shared memory
-    s_cache[2*threadIdx.x]   = g_array_in[2*tid];
-    s_cache[2*threadIdx.x+1] = g_array_in[2*tid+1];
+    if (2*threadIdx.x < length)   s_cache[2*threadIdx.x]   = g_array_in[2*tid];
+    else                          s_cache[2*threadIdx.x]   = 0;
+    if (2*threadIdx.x+1 < length) s_cache[2*threadIdx.x+1] = g_array_in[2*tid+1];
+    else                          s_cache[2*threadIdx.x+1] = 0;
 
     // Perform the prescan
     prescan(s_cache, g_block_sums_out);
 
     // Copy data to the output array
-    g_prescan_out[2*tid]   = s_cache[2*threadIdx.x];
-    g_prescan_out[2*tid+1] = s_cache[2*threadIdx.x+1];
+    if (2*threadIdx.x < length)   g_prescan_out[2*tid]   = s_cache[2*threadIdx.x];
+    if (2*threadIdx.x+1 < length) g_prescan_out[2*tid+1] = s_cache[2*threadIdx.x+1];
 }
 
 
 __global__
-void propagateSum (int *g_level_top, int *g_level_bottom, int top_level_size)
+void propagateSum (int *g_level_top, int *g_level_bottom, int bottom_level_size)
 {
-//        int bottom_level_size = top_level_size*2*THREADS_PER_BLOCK;
+//    int bottom_level_size = top_level_size*2*THREADS_PER_BLOCK;
     int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-    int top_id = tid / (2*THREADS_PER_BLOCK);
+    if (tid < bottom_level_size)
+    {
+        int top_id = tid / (2*THREADS_PER_BLOCK);
 
-    g_level_bottom[tid] += g_level_top[top_id];
+        g_level_bottom[tid] += g_level_top[top_id];
+    }
 }
 
 
