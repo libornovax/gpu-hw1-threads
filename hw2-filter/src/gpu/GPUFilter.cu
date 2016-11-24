@@ -199,7 +199,7 @@ namespace {
 
 
         int level_size = 1;
-        for (int l = g_index_pyramid.size()-1; l > 0; --l)
+        for (int l = g_index_pyramid.size()-2; l > 0; --l)
         {
             propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
                                                               level_size);
