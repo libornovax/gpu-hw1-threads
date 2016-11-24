@@ -22,8 +22,8 @@ namespace {
     void determineIndicesRecursive (std::vector<int*> &g_index_pyramid, std::vector<int> &level_sizes,
                                     int level, int level_size)
     {
-        int shared_mem_size = 2 * THREADS_PER_BLOCK;
-        int num_blocks = std::ceil(double(level_size) / shared_mem_size);
+        int shared_mem_size = 2*THREADS_PER_BLOCK * sizeof(int);
+        int num_blocks = std::ceil(double(level_size) / (2.0*THREADS_PER_BLOCK));
 
         // Allocate memory for the block sums
         int* g_block_sums_out; cudaMalloc((void**)&g_block_sums_out, num_blocks*sizeof(int));
@@ -62,8 +62,8 @@ namespace {
                             std::vector<int*> &g_index_pyramid_out, std::vector<int> &level_sizes_out)
     {
         // Each block can process double the amount of data than the number of threads in it
-        int shared_mem_size = 2 * THREADS_PER_BLOCK;
-        int num_blocks = std::ceil(double(length) / shared_mem_size);
+        int shared_mem_size = 2*THREADS_PER_BLOCK * sizeof(int);
+        int num_blocks = std::ceil(double(length) / (2.0*THREADS_PER_BLOCK));
 
         // Array for block sums of the first level
         int* g_block_sums_out;
