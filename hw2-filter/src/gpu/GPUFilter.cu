@@ -132,7 +132,7 @@ namespace {
         int bottom_level_size = top_level_size*2*THREADS_PER_BLOCK;
         int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-        if (tid > bottom_level_size/2)
+        if (tid >= bottom_level_size/2)
         {
             int top_id = tid / (2*THREADS_PER_BLOCK);
 
@@ -235,6 +235,8 @@ DataArray filterArray (const DataArray &da)
     {
         std::cout << out[i] << std::endl;
     }
+
+    std::cout << "Output size: " << output_size << std::endl;
 
 
 //    // Copy data to gpu
