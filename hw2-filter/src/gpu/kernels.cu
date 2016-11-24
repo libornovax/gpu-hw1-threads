@@ -141,24 +141,28 @@ void onlyPrescan (int *g_array_in, int length, int *g_prescan_out, int *g_block_
 __global__
 void propagateSum (int *g_level_top, int *g_level_bottom, int bottom_level_size)
 {
-//    int bottom_level_size = top_level_size*2*THREADS_PER_BLOCK;
     int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
+    // In case we have an arbitrary size array
     if (tid < bottom_level_size)
     {
+        // Each thread adds the value from the corresponding top element to the bottom one (that is it
+        // shifts the indices by the prescan sum of the previous elements)
         int top_id = tid / (2*THREADS_PER_BLOCK);
-
         g_level_bottom[tid] += g_level_top[top_id];
     }
 }
 
 
 __global__
-void copyElementsToOutput (Data *g_da, int *g_indices, Data *g_da_out)
+void copyElementsToOutput (Data *g_da, int length, int *g_indices, Data *g_da_out)
 {
     int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-    if (filter(g_da[tid].key)) g_da_out[g_indices[tid]] = g_da[tid];
+    if (tid < length)
+    {
+        if (filter(g_da[tid].key)) g_da_out[g_indices[tid]] = g_da[tid];
+    }
 }
 
 
