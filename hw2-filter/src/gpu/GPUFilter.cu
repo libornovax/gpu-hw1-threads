@@ -193,7 +193,7 @@ namespace {
         cudaMemcpy(&output_size_out, g_index_pyramid[g_index_pyramid.size()-1], sizeof(int), cudaMemcpyDeviceToHost);
 
 
-        int level_size = THREADS_PER_BLOCK;
+        int level_size = 2*THREADS_PER_BLOCK;
         for (int l = g_index_pyramid.size()-2; l > 0; --l)
         {
             propagateSum<<<2*level_size, THREADS_PER_BLOCK>>>(g_index_pyramid[l], g_index_pyramid[l-1],
@@ -203,6 +203,15 @@ namespace {
 
             if (l != 0) cudaFree(g_index_pyramid[l]);
         }
+    }
+
+
+    __global__
+    void copyElementsToOutput (Data *g_da, int *g_indices, Data *g_da_out)
+    {
+        int tid = blockIdx.x*blockDim.x + threadIdx.x;
+
+        if (filter(g_da[tid].key)) g_da_out[g_indices[tid]] = g_da[tid];
     }
 }
 
@@ -221,12 +230,19 @@ DataArray filterArray (const DataArray &da)
     int output_size;
     determineIndices(da, g_indices_out, output_size);
 
-    int out[da.size];
-    cudaMemcpy(out, g_indices_out, da.size*sizeof(int), cudaMemcpyDeviceToHost);
+
+    Data* g_da;
+    cudaMalloc((void**)&g_da, output_size*sizeof(Data));
+
+    copyElementsToOutput<<<2*num_blocks, THREADS_PER_BLOCK>>>(da.array, g_indices_out, g_da);
+
+
+    DataArray out(output_size);
+    cudaMemcpy(out.array, g_da, da.size*sizeof(int), cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < da.size; ++i)
     {
-        std::cout << out[i] << std::endl;
+        std::cout << out.array[i].key << std::endl;
     }
 
     std::cout << "Output size: " << output_size << std::endl;
@@ -268,7 +284,7 @@ DataArray filterArray (const DataArray &da)
 //    }
 
 
-    return DataArray(10);
+    return out;
 }
 
 
