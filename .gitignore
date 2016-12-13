@@ -2,4 +2,6 @@ hw1-threads/bin/*
 hw1-threads/build/*
 hw2-filter/bin/*
 hw2-filter/build/*
+hw3-mergesort/bin/*
+hw3-mergesort/build/*
 *.user
