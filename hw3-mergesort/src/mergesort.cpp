@@ -11,6 +11,7 @@
 #include "settings.h"
 #include "utils.h"
 #include "cpu/CPUSort.h"
+#include "gpu/GPUSort.h"
 
 
 int main (int argc, char* argv[])
@@ -36,8 +37,18 @@ int main (int argc, char* argv[])
     std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
 #endif
 
-//    std::cout << "CPU sorted sequence: " << std::endl;
-//    utils::printSequence(seq_cpu);
+    if (GPUSort::initialize())
+    {
+#ifdef MEASURE_TIME
+        auto start2 = std::chrono::high_resolution_clock::now();
+#endif
+        // Sort data on GPU
+        GPUSort::sortSequence(seq_gpu);
+#ifdef MEASURE_TIME
+        auto end2 = std::chrono::high_resolution_clock::now();
+        std::cout << "GPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2-start2).count() << " ms" << std::endl;
+#endif
+    }
 
 
     if (utils::compareSequences(seq_cpu, seq_gpu))

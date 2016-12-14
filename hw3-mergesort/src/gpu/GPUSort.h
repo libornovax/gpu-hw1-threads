@@ -8,6 +8,11 @@ namespace GPUSort {
 
     void sortSequence (std::vector<float> &seq);
 
+    /**
+     * @brief Initializes the CUDA environment
+     */
+    bool initialize ();
+
 }
 
 
