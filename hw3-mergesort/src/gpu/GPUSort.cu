@@ -10,19 +10,48 @@
 
 namespace GPUSort {
 
+    void bitonicSortHost (float *g_seq_in_out, int length)
+    {
+        // Number of blocks we have to launch to process the whole sequence - each block processes 2 times
+        // its size of elements
+        int num_blocks = length / (2*THREADS_PER_BLOCK);
+        int shared_mem_size = std::min(2*THREADS_PER_BLOCK, length) * sizeof(float);
+
+        assert(length == num_blocks*THREADS_PER_BLOCK*2);  // We only support 2^n sequence sizes
+
+
+        for (int i = 2; i <= length; i <<= 1)
+        {
+            for (int j = i; j >= 2; j >>= 1)
+            {
+                if (j <= 2*THREADS_PER_BLOCK)
+                {
+                    // We can process the rest in parallel without interfering (we do not need to synchronize
+                    // the blocks at this level)
+                    bitonicSort<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_seq_in_out, length);
+                    break;
+                }
+                else
+                {
+                    // The spread of the comparators is too big to be processed without block synchronization
+                    // Launch only this comparison on a GPU
+                    bitonicCompare<<< num_blocks, THREADS_PER_BLOCK >>>(g_seq_in_out, length, i, j);
+                }
+
+                cudaDeviceSynchronize();
+            }
+        }
+    }
+
+
     void sortSequence (std::vector<float> &seq)
     {
         // Copy data to GPU
         float* g_seq_in_out; cudaMalloc((void**)&g_seq_in_out, seq.size()*sizeof(float));
         cudaMemcpy(g_seq_in_out, seq.data(), seq.size()*sizeof(float), cudaMemcpyHostToDevice);
 
-        int num_blocks      = seq.size() / (THREADS_PER_BLOCK * 2);
-        int shared_mem_size = 2*THREADS_PER_BLOCK * sizeof(float);
 
-        assert(seq.size() == num_blocks*THREADS_PER_BLOCK*2);  // We only support power on 2 sequence sizes
-
-
-        bitonicSort<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_seq_in_out, seq.size());
+        bitonicSortHost(g_seq_in_out, seq.size());
 
 
         cudaMemcpy(seq.data(), g_seq_in_out, seq.size()*sizeof(float), cudaMemcpyDeviceToHost);
