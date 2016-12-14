@@ -34,6 +34,7 @@ void bitonicSort (float *g_sequence_in_out, int length)
     int x = threadIdx.x;
     for (int i = 2; i <= s_sequence_length; i <<= 1)
     {
+        int i_half = i >> 1;
         for (int j = i; j >= 2; j >>= 1)
         {
             int j_half = j >> 1;
@@ -41,7 +42,7 @@ void bitonicSort (float *g_sequence_in_out, int length)
             int id2 = id1 + j_half;
 
             // Swap if out of order
-            bool smaller1 = int(x/j_half) % 2 == 0;
+            bool smaller1 = int(x / i_half) % 2 == 0;
             if ((s_sequence[id1] > s_sequence[id2]) == smaller1)
             {
                 // Swap the numbers
