@@ -9,7 +9,7 @@
 //#define SEQUENCE_LENGTH 1048576  // 1024*1024
 
 // Threads that will run in each block (must be 2^n)
-#define THREADS_PER_BLOCK 128
+#define THREADS_PER_BLOCK 64
 
 
 #endif // SETTINGS_H

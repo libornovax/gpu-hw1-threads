@@ -34,7 +34,7 @@ void bitonicSort (float *g_sequence_in_out, int length)
     int x = threadIdx.x;
     for (int i = 2; i <= s_sequence_length; i <<= 1)
     {
-        for (int j = i; j >= 2; j >> 1)
+        for (int j = i; j >= 2; j >>= 1)
         {
             int j_half = j >> 1;
             int id1 = j * int(x/j_half) + x % j_half;
