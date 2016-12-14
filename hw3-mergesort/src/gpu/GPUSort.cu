@@ -19,7 +19,7 @@ namespace GPUSort {
         int num_blocks      = seq.size() / (THREADS_PER_BLOCK * 2);
         int shared_mem_size = 2*THREADS_PER_BLOCK * sizeof(float);
 
-        assert(seq.size() == num_blocks*THREADS_PER_BLOCK);  // We only support power on 2 sequence sizes
+        assert(seq.size() == num_blocks*THREADS_PER_BLOCK*2);  // We only support power on 2 sequence sizes
 
 
         bitonicSort<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_seq_in_out, seq.size());
