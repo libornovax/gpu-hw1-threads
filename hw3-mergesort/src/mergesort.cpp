@@ -17,6 +17,7 @@
 int main (int argc, char* argv[])
 {
     std::cout << "-- SEQUENCE LENGTH: " << SEQUENCE_LENGTH << std::endl;
+    std::cout << "-- THREADS PER BLOCK: " << THREADS_PER_BLOCK << std::endl;
 
     std::vector<float> seq = utils::generateRandomSequence();
 
