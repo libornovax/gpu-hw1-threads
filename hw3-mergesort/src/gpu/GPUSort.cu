@@ -16,11 +16,13 @@ namespace GPUSort {
         float* g_seq_in_out; cudaMalloc((void**)&g_seq_in_out, seq.size()*sizeof(float));
         cudaMemcpy(g_seq_in_out, seq.data(), seq.size()*sizeof(float), cudaMemcpyHostToDevice);
 
+        int num_blocks      = seq.size() / (THREADS_PER_BLOCK * 2);
+        int shared_mem_size = 2*THREADS_PER_BLOCK * sizeof(float);
 
-        int num_blocks = seq.size() / THREADS_PER_BLOCK;
         assert(seq.size() == num_blocks*THREADS_PER_BLOCK);  // We only support power on 2 sequence sizes
 
-        bitonicSort<<< num_blocks, THREADS_PER_BLOCK >>>(g_seq_in_out, seq.size());
+
+        bitonicSort<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_seq_in_out, seq.size());
 
 
         cudaMemcpy(seq.data(), g_seq_in_out, seq.size()*sizeof(float), cudaMemcpyDeviceToHost);

@@ -1,5 +1,7 @@
 #include "CPUSort.h"
 
+#include <algorithm>
+
 
 namespace CPUSort {
 
