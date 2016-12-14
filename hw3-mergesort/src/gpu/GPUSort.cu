@@ -10,6 +10,11 @@
 
 namespace GPUSort {
 
+    /**
+     * @brief Sorting function on the host machine, which calls CUDA kernels to do the separate steps
+     * @param g_seq_in_out Pointer to GPU memory with the sequence
+     * @param length Length of the sequence
+     */
     void bitonicSortHost (float *g_seq_in_out, int length)
     {
         // Number of blocks we have to launch to process the whole sequence - each block processes 2 times
@@ -19,16 +24,17 @@ namespace GPUSort {
 
         assert(length == num_blocks*THREADS_PER_BLOCK*2);  // We only support 2^n sequence sizes
 
-
-        for (int i = 2; i <= length; i <<= 1)
+        // Since we do not allow shorter sequences than 2*THREADS_PER_BLOCK we can start directly at that
+        // level because that level will be solved by separate blocks
+        for (int i = 2*THREADS_PER_BLOCK; i <= length; i <<= 1)
         {
             for (int j = i; j >= 2; j >>= 1)
             {
-                if (j <= 2*THREADS_PER_BLOCK)
+                if (j == 2*THREADS_PER_BLOCK)
                 {
                     // We can process the rest in parallel without interfering (we do not need to synchronize
                     // the blocks at this level)
-                    bitonicSort<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_seq_in_out, length);
+                    bitonicSort<<< num_blocks, THREADS_PER_BLOCK, shared_mem_size >>>(g_seq_in_out, length, i);
                     break;
                 }
                 else

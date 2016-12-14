@@ -6,7 +6,7 @@
 
 
 __global__
-void bitonicSort (float *g_sequence_in_out, int length);
+void bitonicSort (float *g_sequence_in_out, int length, int i_global);
 
 __global__
 void bitonicCompare (float *g_sequence_in_out, int length, int i, int j);

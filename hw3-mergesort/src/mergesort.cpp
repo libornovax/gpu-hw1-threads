@@ -34,7 +34,6 @@ int main (int argc, char* argv[])
     CPUSort::sortSequence(seq_cpu);
 #ifdef MEASURE_TIME
     auto end1 = std::chrono::high_resolution_clock::now();
-    std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
 #endif
 
     if (GPUSort::initialize())
@@ -46,6 +45,7 @@ int main (int argc, char* argv[])
         GPUSort::sortSequence(seq_gpu);
 #ifdef MEASURE_TIME
         auto end2 = std::chrono::high_resolution_clock::now();
+        std::cout << "CPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1-start1).count() << " ms" << std::endl;
         std::cout << "GPU time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2-start2).count() << " ms" << std::endl;
 #endif
     }
